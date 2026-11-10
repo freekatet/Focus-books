@@ -988,6 +988,32 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // API 5: Resolve Live Direct Audio Stream URL for ANY YouTube Video ID on the fly (Zero file download)
+  if (pathname === '/api/youtube-stream' && req.method === 'GET') {
+    const videoId = extractYouTubeId(parsedUrl.searchParams.get('v') || parsedUrl.searchParams.get('url') || '');
+    if (!videoId) {
+      res.writeHead(400, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Invalid YouTube Video ID' }));
+      return;
+    }
+    execFile(
+      'yt-dlp',
+      ['--js-runtimes', 'node', '-g', '-f', 'ba[ext=m4a]/ba', `https://www.youtube.com/watch?v=${videoId}`],
+      { timeout: 12000 },
+      (err, stdout) => {
+        const streamUrl = (stdout || '').trim().split('\n')[0];
+        if (err || !streamUrl) {
+          res.writeHead(404, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Could not resolve direct stream' }));
+          return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+        res.end(JSON.stringify({ videoId, streamUrl }));
+      }
+    );
+    return;
+  }
+
   // Static file serving
   let safePath = pathname === '/' ? '/index.html' : pathname;
   const filePath = path.normalize(path.join(PUBLIC_DIR, safePath));

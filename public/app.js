@@ -674,19 +674,17 @@
 
     el.ytDockPanel.classList.toggle('hidden', state.audioEngine !== 'youtube');
 
-    // If this chapter has a native .m4a audio stream (e.g. Palmer Eldritch), pre-cue native <audio>
-    // and skip the YouTube iframe so iOS Lock Screen & background audio work 100% natively!
-    const rawChapter = state.book?.chapters?.[state.currentChapterIndex];
-    if (rawChapter && rawChapter.audioUrl) {
-      el.ytDockPanel.classList.add('minimized');
-      el.btnToggleYtMinimize.textContent = '□';
-      const audioSrc = normalizeRelativeAssetUrl(rawChapter.audioUrl);
-      if (state.htmlAudio.dataset.loadedSrc !== audioSrc) {
-        state.htmlAudio.src = audioSrc;
-        state.htmlAudio.dataset.loadedSrc = audioSrc;
-        state.htmlAudio.preload = 'auto';
+    // Dynamically resolve a live direct <audio> stream URL on the fly for ANY YouTube video (zero pre-downloaded files!)
+    if (window.EpubLoader && typeof window.EpubLoader.resolveYouTubeAudioStreamUrl === 'function') {
+      if (state.resolvedStreamVideoId !== videoId) {
+        state.resolvedStreamVideoId = videoId;
+        state.liveYoutubeStreamUrl = null;
+        window.EpubLoader.resolveYouTubeAudioStreamUrl(videoId).then((streamUrl) => {
+          if (streamUrl && state.book?.youtubeVideoId === videoId) {
+            state.liveYoutubeStreamUrl = streamUrl;
+          }
+        });
       }
-      return;
     }
 
     if (!state.ytApiReady) {
@@ -1294,6 +1292,20 @@
   function updateLockScreenMediaSession() {
     if (!('mediaSession' in navigator) || !state.book) return;
     try {
+      // IMPORTANT FOR iOS WEBKIT:
+      // If playing via the cross-origin YouTube <iframe> (and NOT parent <audio>),
+      // the parent document MUST NOT register MediaSession handlers, otherwise iOS routes
+      // the Lock Screen Play button to the parent document (which has no playing <audio>) and immediately stops!
+      if (state.audioEngine === 'youtube' && !state.usingNativeChapterAudio) {
+        navigator.mediaSession.metadata = null;
+        ['play', 'pause', 'previoustrack', 'nexttrack', 'seekbackward', 'seekforward'].forEach((act) => {
+          try {
+            navigator.mediaSession.setActionHandler(act, null);
+          } catch (_) {}
+        });
+        return;
+      }
+
       const chapTitle = state.parsedChapter?.title || 'Chapter 1';
       const coverSrc = normalizeRelativeAssetUrl(state.book.coverUrl || './books/palmer-eldritch/cover.jpeg');
       const absCover = new URL(coverSrc, window.location.href).href;
@@ -1311,8 +1323,6 @@
         if (!state.isPlaying) startPlayback();
         else if (state.usingNativeChapterAudio && state.htmlAudio) {
           state.htmlAudio.play().catch(() => {});
-        } else if (state.audioEngine === 'youtube' && state.ytPlayer?.playVideo) {
-          state.ytPlayer.playVideo();
         }
       });
       navigator.mediaSession.setActionHandler('pause', () => {
@@ -1425,7 +1435,7 @@
   }
 
   /**
-   * Option C: Native HTML5 <audio> Chapter Stream (for 100% iOS Lock Screen support) + YouTube IFrame Fallback
+   * Option C: Dynamic Live <audio> Stream for ANY YouTube Link + YouTube IFrame Player
    */
   function playYouTubeFromToken(tokenIndex) {
     const pc = state.parsedChapter;
@@ -1433,12 +1443,17 @@
     if (!token) return;
 
     const rawChapter = state.book?.chapters?.[state.currentChapterIndex];
-    if (rawChapter && rawChapter.audioUrl) {
-      playNativeChapterAudioFromToken(tokenIndex, rawChapter);
+    const dynamicAudioUrl = rawChapter?.audioUrl || state.liveYoutubeStreamUrl;
+    if (dynamicAudioUrl) {
+      playNativeChapterAudioFromToken(tokenIndex, {
+        audioUrl: dynamicAudioUrl,
+        audioOffsetMs: rawChapter?.audioUrl ? (rawChapter.audioOffsetMs || 0) : 0
+      });
       return;
     }
 
     state.usingNativeChapterAudio = false;
+    updateLockScreenMediaSession();
     state.lastPlayCommandPerf = performance.now();
     const targetSeconds = token.startMs / 1000;
 
@@ -1532,10 +1547,10 @@
     };
 
     state.htmlAudio.play().catch(() => {
-      // Fallback to YouTube iframe if audio file isn't cached/ready yet
+      // Fallback to YouTube iframe if dynamic stream is blocked by CORS or unavailable
       state.usingNativeChapterAudio = false;
-      const fallbackChap = Object.assign({}, rawChapter, { audioUrl: '' });
-      state.book.chapters[state.currentChapterIndex] = fallbackChap;
+      state.liveYoutubeStreamUrl = null;
+      updateLockScreenMediaSession();
       playYouTubeFromToken(tokenIndex);
     });
 
@@ -2038,12 +2053,6 @@
           optionsHubBackdrop.classList.add('hidden');
         }
       });
-    }
-
-    // Start YouTube panel minimized on mobile/iPhone so it never blocks the reading text
-    if (window.innerWidth <= 768 && el.ytDockPanel && el.btnToggleYtMinimize) {
-      el.ytDockPanel.classList.add('minimized');
-      el.btnToggleYtMinimize.textContent = '□';
     }
 
     el.modeTabs.forEach((tab) => {

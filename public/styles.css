@@ -1580,13 +1580,13 @@ html, body {
 }
 
 .yt-dock-panel.minimized {
-  width: 235px;
+  width: 200px;
 }
 
+/* Keep video frame >= 68px tall and 100% opaque even when compact so iOS WebKit never treats the video as hidden/invisible */
 .yt-dock-panel.minimized .yt-player-body {
-  height: 1px !important;
-  opacity: 0.01;
-  pointer-events: none;
+  height: 76px !important;
+  opacity: 1;
   overflow: hidden;
 }
 
