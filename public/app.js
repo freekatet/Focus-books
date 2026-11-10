@@ -494,9 +494,12 @@
         try {
           showToast(`Loading "${b.title}"...`);
           let fullBook = await window.EpubLoader.getBookFromIndexedDB(b.id);
-          if (!fullBook && b.dataUrl) {
-            const res = await fetch(normalizeRelativeAssetUrl(b.dataUrl));
-            if (res.ok) fullBook = await res.json();
+          if ((!fullBook || (b.id === 'palmer-eldritch' && !fullBook.chapters?.[1]?.audioUrl)) && b.dataUrl) {
+            const res = await fetch(normalizeRelativeAssetUrl(b.dataUrl) + '?v=9');
+            if (res.ok) {
+              fullBook = await res.json();
+              window.EpubLoader.saveBookToIndexedDB(fullBook).catch(() => {});
+            }
           }
           if (!fullBook) throw new Error('Could not load saved book data');
           loadBookWithSavedPlayhead(fullBook, b.progress);
@@ -562,9 +565,12 @@
     if (targetEntry) {
       try {
         let bookData = await window.EpubLoader.getBookFromIndexedDB(targetEntry.id);
-        if (!bookData && targetEntry.dataUrl) {
-          const res = await fetch(normalizeRelativeAssetUrl(targetEntry.dataUrl));
-          if (res.ok) bookData = await res.json();
+        if ((!bookData || (targetEntry.id === 'palmer-eldritch' && !bookData.chapters?.[1]?.audioUrl)) && targetEntry.dataUrl) {
+          const res = await fetch(normalizeRelativeAssetUrl(targetEntry.dataUrl) + '?v=9');
+          if (res.ok) {
+            bookData = await res.json();
+            window.EpubLoader.saveBookToIndexedDB(bookData).catch(() => {});
+          }
         }
         if (bookData) {
           const localMap = getLocalPlayheadMap();
@@ -577,7 +583,7 @@
 
     // Fallback to default Palmer Eldritch
     try {
-      const res = await fetch('./books/palmer-eldritch/book.json');
+      const res = await fetch('./books/palmer-eldritch/book.json?v=9');
       if (res.ok) {
         const bookData = await res.json();
         loadBookWithSavedPlayhead(bookData, null);
@@ -667,6 +673,21 @@
     }
 
     el.ytDockPanel.classList.toggle('hidden', state.audioEngine !== 'youtube');
+
+    // If this chapter has a native .m4a audio stream (e.g. Palmer Eldritch), pre-cue native <audio>
+    // and skip the YouTube iframe so iOS Lock Screen & background audio work 100% natively!
+    const rawChapter = state.book?.chapters?.[state.currentChapterIndex];
+    if (rawChapter && rawChapter.audioUrl) {
+      el.ytDockPanel.classList.add('minimized');
+      el.btnToggleYtMinimize.textContent = '□';
+      const audioSrc = normalizeRelativeAssetUrl(rawChapter.audioUrl);
+      if (state.htmlAudio.dataset.loadedSrc !== audioSrc) {
+        state.htmlAudio.src = audioSrc;
+        state.htmlAudio.dataset.loadedSrc = audioSrc;
+        state.htmlAudio.preload = 'auto';
+      }
+      return;
+    }
 
     if (!state.ytApiReady) {
       state.currentVideoId = videoId;
