@@ -211,13 +211,13 @@ html, body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 56px;
+  min-height: 52px;
   height: auto;
-  flex-wrap: wrap;
-  padding: 6px 16px;
+  flex-wrap: nowrap;
+  padding: calc(6px + env(safe-area-inset-top, 0px)) 14px 6px;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
-  gap: 10px;
+  gap: 8px;
   flex-shrink: 0;
   z-index: 20;
 }
@@ -225,8 +225,89 @@ html, body {
 .top-bar-left {
   display: flex;
   align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.compact-top-btn {
+  padding: 6px 10px !important;
+  font-size: 12px !important;
+  white-space: nowrap;
+}
+
+/* ================= COLLAPSIBLE OPTIONS & MODES HUB ================= */
+.options-hub-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: calc(56px + env(safe-area-inset-top, 0px)) 12px 20px;
+  z-index: 95;
+}
+
+.options-hub-card {
+  width: 100%;
+  max-width: 680px;
+  max-height: calc(100dvh - 80px);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-focus);
+  border-radius: 14px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.75);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.options-hub-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-subtle);
+  background: var(--bg-Elevated);
+}
+
+.options-hub-header h3 {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.options-hub-body {
+  padding: 14px 16px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.hub-section {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
-  min-width: 240px;
+}
+
+.hub-section-label {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+.hub-actions-row {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
 }
 
 .book-identity {
@@ -1495,11 +1576,13 @@ html, body {
 }
 
 .yt-dock-panel.minimized {
-  width: 240px;
+  width: 235px;
 }
 
 .yt-dock-panel.minimized .yt-player-body {
-  height: 0 !important;
+  height: 1px !important;
+  opacity: 0.01;
+  pointer-events: none;
   overflow: hidden;
 }
 
@@ -1760,108 +1843,108 @@ html, body {
 /* ================= MOBILE & iOS PWA RESPONSIVE LAYOUT ================= */
 @media (max-width: 860px) {
   .top-bar {
-    height: auto;
-    flex-wrap: wrap;
-    padding: calc(8px + env(safe-area-inset-top, 0px)) 10px 8px;
-    gap: 8px;
+    flex-wrap: nowrap;
+    padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 6px;
+    gap: 6px;
   }
 
   .top-bar-left {
-    min-width: auto;
+    min-width: 0;
     flex: 1;
   }
 
+  .cover-thumb {
+    width: 24px;
+    height: 34px;
+  }
+
   .book-title {
-    max-width: 150px;
-    font-size: 12.5px;
+    max-width: 120px;
+    font-size: 12px;
   }
 
-  .book-author {
+  .book-author,
+  .chapter-stats {
     display: none;
   }
 
-  .sprint-timer-pill {
-    display: none;
+  .compact-top-btn {
+    padding: 5px 8px !important;
+    font-size: 11px !important;
   }
 
   .mode-switcher {
-    order: 3;
     width: 100%;
-    overflow-x: auto;
+    flex-wrap: wrap;
     justify-content: flex-start;
-    -webkit-overflow-scrolling: touch;
+    gap: 6px;
   }
 
   .mode-tab {
-    padding: 5px 10px;
-    font-size: 11.5px;
-  }
-
-  .cognitive-subbar {
-    height: auto;
     padding: 6px 10px;
-    overflow-x: auto;
-    gap: 10px;
-    -webkit-overflow-scrolling: touch;
+    font-size: 12px;
+    flex: 1 1 calc(50% - 6px);
+    justify-content: flex-start;
   }
 
   .subbar-controls {
-    white-space: nowrap;
-    gap: 10px;
-  }
-
-  .sync-telemetry {
-    display: none;
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   .reading-viewport {
-    padding: 20px 14px 140px;
+    padding: 18px 14px 120px;
+  }
+
+  .chapter-header-banner {
+    margin-bottom: 20px;
+    padding-bottom: 12px;
   }
 
   .chapter-header-banner h1 {
-    font-size: 22px;
+    font-size: 21px;
   }
 
   .rsvp-reticle-box {
-    height: 160px;
+    height: 150px;
   }
 
   .rsvp-word-grid {
-    font-size: 36px;
+    font-size: 34px;
   }
 
   .teleprompter-active-clause {
-    font-size: 24px;
+    font-size: 22px;
   }
 
   .yt-dock-panel {
-    width: 210px;
-    bottom: 84px;
-    right: 10px;
+    width: 220px;
+    bottom: 74px;
+    right: 8px;
   }
 
   .yt-player-body {
-    height: 118px;
+    height: 124px;
   }
 
   .transport-bar {
     height: auto;
-    flex-wrap: wrap;
-    padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
-    gap: 10px;
+    flex-wrap: nowrap;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+    gap: 8px;
   }
 
   .transport-center {
-    order: -1;
-    width: 100%;
-    max-width: none;
-    flex: 1 1 100%;
+    flex: 1;
+    min-width: 0;
   }
 
   .active-phrase-preview {
-    max-width: 220px;
+    max-width: 140px;
+    font-size: 11px;
   }
 
+  .speed-presets,
   .speed-slider {
     display: none;
   }

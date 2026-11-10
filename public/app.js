@@ -900,6 +900,18 @@
       btn.classList.toggle('active', btn.dataset.mode === state.mode);
     });
 
+    const modeBadgeMap = {
+      bionic: 'Options · Mode 1 (Bionic)',
+      chunking: 'Options · Mode 2 (Stanza)',
+      rsvp: 'Options · Mode 3 (RSVP)',
+      karaoke: 'Options · Mode 4 (Karaoke)',
+      teleprompter: 'Options · Mode 5 (Prompter)'
+    };
+    const lblActiveModeBtn = document.getElementById('lbl-active-mode-btn');
+    if (lblActiveModeBtn) {
+      lblActiveModeBtn.textContent = modeBadgeMap[state.mode] || 'Options';
+    }
+
     el.modeDescriptionText.innerHTML = MODE_DESCRIPTIONS[state.mode] || '';
 
     el.ctrlModeChunking.classList.toggle('hidden', state.mode !== 'chunking');
@@ -1776,6 +1788,34 @@
   }
 
   function bindUIEvents() {
+    const optionsHubBackdrop = document.getElementById('options-hub-backdrop');
+    const btnToggleOptionsHub = document.getElementById('btn-toggle-options-hub');
+    const btnCloseOptionsHub = document.getElementById('btn-close-options-hub');
+
+    if (btnToggleOptionsHub && optionsHubBackdrop) {
+      btnToggleOptionsHub.addEventListener('click', () => {
+        optionsHubBackdrop.classList.toggle('hidden');
+      });
+    }
+    if (btnCloseOptionsHub && optionsHubBackdrop) {
+      btnCloseOptionsHub.addEventListener('click', () => {
+        optionsHubBackdrop.classList.add('hidden');
+      });
+    }
+    if (optionsHubBackdrop) {
+      optionsHubBackdrop.addEventListener('click', (e) => {
+        if (e.target === optionsHubBackdrop) {
+          optionsHubBackdrop.classList.add('hidden');
+        }
+      });
+    }
+
+    // Start YouTube panel minimized on mobile/iPhone so it never blocks the reading text
+    if (window.innerWidth <= 768 && el.ytDockPanel && el.btnToggleYtMinimize) {
+      el.ytDockPanel.classList.add('minimized');
+      el.btnToggleYtMinimize.textContent = '□';
+    }
+
     el.modeTabs.forEach((tab) => {
       tab.addEventListener('click', () => {
         state.mode = tab.dataset.mode;
@@ -2010,6 +2050,7 @@
     });
 
     document.getElementById('btn-toggle-settings').addEventListener('click', () => {
+      if (optionsHubBackdrop) optionsHubBackdrop.classList.add('hidden');
       el.settingsDrawer.classList.toggle('hidden');
     });
     document.getElementById('btn-close-settings').addEventListener('click', () => {
@@ -2133,6 +2174,7 @@
 
     // Import Modal
     document.getElementById('btn-open-import').addEventListener('click', () => {
+      if (optionsHubBackdrop) optionsHubBackdrop.classList.add('hidden');
       el.modalImport.classList.remove('hidden');
     });
     document.getElementById('btn-close-import').addEventListener('click', () => {

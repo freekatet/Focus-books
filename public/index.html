@@ -15,17 +15,17 @@
 </head>
 <body>
   <div id="app" class="app-shell">
-    <!-- Top Cognitive Navigation & Mode Bar -->
+    <!-- Minimal Single-Row Top Bar (Text-First Reading View) -->
     <header class="top-bar">
       <div class="top-bar-left">
-        <button id="btn-toggle-sidebar" class="icon-btn" title="Chapters & Book Info (T)">
+        <button id="btn-toggle-sidebar" class="icon-btn" title="Chapters & Table of Contents">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <line x1="3" y1="6" x2="21" y2="6"></line>
             <line x1="3" y1="12" x2="15" y2="12"></line>
             <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
         </button>
-        <div class="book-identity" id="btn-open-chapters" title="Click to switch chapters">
+        <div class="book-identity" id="btn-open-chapters" title="Tap to switch chapters">
           <img id="book-cover-thumb" src="./books/palmer-eldritch/cover.jpeg" alt="Cover" class="cover-thumb" />
           <div class="book-meta-text">
             <div class="book-title-row">
@@ -40,148 +40,175 @@
         </div>
       </div>
 
-      <!-- 5 Cognitive Display Modes Switcher -->
-      <nav class="mode-switcher" aria-label="Cognitive Display Modes">
-        <button class="mode-tab active" data-mode="bionic" title="Mode 1: Bionic Reading (Full Page Document Flow) [Key: 1]">
-          <span class="mode-num">1</span>
-          <span class="mode-label"><strong>Bio</strong>nic Flow</span>
-        </button>
-        <button class="mode-tab" data-mode="chunking" title="Mode 2: Syntactic Chunking (3-6 Word Stanza Layout) [Key: 2]">
-          <span class="mode-num">2</span>
-          <span class="mode-label">Syntactic Stanza</span>
-        </button>
-        <button class="mode-tab" data-mode="rsvp" title="Mode 3: Rapid Serial Visual Presentation with ORP Center Anchoring [Key: 3]">
-          <span class="mode-num">3</span>
-          <span class="mode-label">RSVP <span class="orp-dot">•</span> ORP</span>
-        </button>
-        <button class="mode-tab" data-mode="karaoke" title="Mode 4: Dynamic Karaoke / Spotlight Highlighting [Key: 4]">
-          <span class="mode-num">4</span>
-          <span class="mode-label">Karaoke Spotlight</span>
-        </button>
-        <button class="mode-tab" data-mode="teleprompter" title="Mode 5: Paced Teleprompter (Guided RSVP-Chunk Hybrid) [Key: 5]">
-          <span class="mode-num">5</span>
-          <span class="mode-label">Teleprompter</span>
-        </button>
-      </nav>
-
-      <!-- Right Controls: Focus Sprint Timer, Import EPUB/YouTube/Text, Settings -->
       <div class="top-bar-right">
-        <div class="sprint-timer-pill" id="sprint-timer-widget" title="Cognitive Focus Sprint Timer">
-          <svg class="sprint-ring" width="26" height="26" viewBox="0 0 36 36">
-            <circle class="sprint-ring-bg" cx="18" cy="18" r="15" fill="none" stroke-width="3"></circle>
-            <circle id="sprint-ring-progress" class="sprint-ring-fg" cx="18" cy="18" r="15" fill="none" stroke-width="3" stroke-dasharray="94.25" stroke-dashoffset="0"></circle>
-          </svg>
-          <div class="sprint-info">
-            <span class="sprint-label">FOCUS SPRINT</span>
-            <span id="sprint-time-display" class="sprint-time">12:00</span>
-          </div>
-          <button id="btn-sprint-toggle" class="sprint-action-btn" title="Start / Pause Focus Sprint">Start</button>
-          <select id="sprint-duration-select" class="sprint-select" title="Select Focus Sprint Duration">
-            <option value="10">10m</option>
-            <option value="12" selected>12m</option>
-            <option value="15">15m</option>
-            <option value="20">20m</option>
-          </select>
-        </div>
-
-        <button id="btn-open-library" class="secondary-btn" title="Open Saved Library & Resume Playheads (L)">
+        <button id="btn-open-library" class="secondary-btn compact-top-btn" title="Open Saved Library & Apple Books">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
             <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
             <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
           </svg>
-          <span>Library (<span id="library-count-badge">1</span>)</span>
+          <span>Library (<span id="library-count-badge">16</span>)</span>
         </button>
 
-        <button id="btn-open-import" class="secondary-btn" title="Import YouTube Audiobook, EPUB file, or custom text">
+        <button id="btn-toggle-options-hub" class="primary-btn compact-top-btn" title="Open Reading Modes, Text Options, Audio & Import">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
+            <line x1="4" y1="21" x2="4" y2="14"></line>
+            <line x1="4" y1="10" x2="4" y2="3"></line>
+            <line x1="12" y1="21" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12" y2="3"></line>
+            <line x1="20" y1="21" x2="20" y2="16"></line>
+            <line x1="20" y1="12" x2="20" y2="3"></line>
+            <line x1="1" y1="14" x2="7" y2="14"></line>
+            <line x1="9" y1="8" x2="15" y2="8"></line>
+            <line x1="17" y1="16" x2="23" y2="16"></line>
           </svg>
-          <span>+ Import</span>
-        </button>
-
-        <button id="btn-toggle-settings" class="icon-btn" title="Typography, Themes & Audio Pipeline Settings">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-          </svg>
+          <span id="lbl-active-mode-btn">Options · Mode 1</span>
         </button>
       </div>
     </header>
 
-    <!-- Sub-toolbar: Cognitive Modifiers & Live Sync Telemetry -->
-    <div class="cognitive-subbar">
-      <div class="subbar-controls">
-        <label class="toggle-chip" title="Toggle Bionic 30-50% fixation stems on words (Key: B)">
-          <input type="checkbox" id="chk-bionic-stems" checked />
-          <span><strong>Bio</strong>nic Stems</span>
-        </label>
-
-        <div class="control-group" id="ctrl-bionic-intensity">
-          <span class="ctrl-label">Fixation:</span>
-          <button class="mini-pill" data-bionic-delta="-1" title="Lighter stem (30%)">Light</button>
-          <button class="mini-pill active" data-bionic-delta="0" title="Standard spec stem (35-45%)">Spec</button>
-          <button class="mini-pill" data-bionic-delta="1" title="Stronger stem (50%)">Deep</button>
+    <!-- Collapsible Text Options, Reading Modes, Audio & Library Menu (Hidden by default so you just see the text) -->
+    <div id="options-hub-backdrop" class="options-hub-backdrop hidden">
+      <div class="options-hub-card" id="options-hub-card">
+        <div class="options-hub-header">
+          <h3>Text Options, Reading Modes & Controls</h3>
+          <button id="btn-close-options-hub" class="icon-btn-sm" title="Close Options">✕</button>
         </div>
 
-        <!-- Quick Audio Source Switcher Pill -->
-        <div class="control-group">
-          <span class="ctrl-label">Audio Stream:</span>
-          <button class="mini-pill active" id="pill-source-youtube" data-audio-source="youtube" title="Option C: Synchronized YouTube Audiobook Stream with exact word timestamps">
-            ▶ YouTube Audiobook
-          </button>
-          <button class="mini-pill" id="pill-source-webspeech" data-audio-source="webspeech" title="Option B: Native Browser Web Speech TTS + onboundary">
-            Web Speech TTS
-          </button>
-          <button class="mini-pill" id="pill-source-pacer" data-audio-source="pacer" title="Silent 60Hz Visual Pacer Clock">
-            Silent Pacer
-          </button>
+        <div class="options-hub-body">
+          <!-- 1. 5 Cognitive Display Modes Switcher -->
+          <div class="hub-section">
+            <div class="hub-section-label">1. READING DISPLAY MODE</div>
+            <nav class="mode-switcher" aria-label="Cognitive Display Modes">
+              <button class="mode-tab active" data-mode="bionic" title="Mode 1: Bionic Reading (Full Page Document Flow)">
+                <span class="mode-num">1</span>
+                <span class="mode-label"><strong>Bio</strong>nic Flow</span>
+              </button>
+              <button class="mode-tab" data-mode="chunking" title="Mode 2: Syntactic Chunking (3-6 Word Stanza Layout)">
+                <span class="mode-num">2</span>
+                <span class="mode-label">Syntactic Stanza</span>
+              </button>
+              <button class="mode-tab" data-mode="rsvp" title="Mode 3: Rapid Serial Visual Presentation with ORP Center Anchoring">
+                <span class="mode-num">3</span>
+                <span class="mode-label">RSVP <span class="orp-dot">•</span> ORP</span>
+              </button>
+              <button class="mode-tab" data-mode="karaoke" title="Mode 4: Dynamic Karaoke / Spotlight Highlighting">
+                <span class="mode-num">4</span>
+                <span class="mode-label">Karaoke Spotlight</span>
+              </button>
+              <button class="mode-tab" data-mode="teleprompter" title="Mode 5: Paced Teleprompter (Guided RSVP-Chunk Hybrid)">
+                <span class="mode-num">5</span>
+                <span class="mode-label">Teleprompter</span>
+              </button>
+            </nav>
+          </div>
+
+          <!-- 2. Cognitive Text Modifiers & Theme -->
+          <div class="hub-section">
+            <div class="hub-section-label">2. TEXT FORMATTING & THEME</div>
+            <div class="subbar-controls">
+              <label class="toggle-chip" title="Toggle Bionic 30-50% fixation stems on words">
+                <input type="checkbox" id="chk-bionic-stems" checked />
+                <span><strong>Bio</strong>nic Stems</span>
+              </label>
+
+              <div class="control-group" id="ctrl-bionic-intensity">
+                <span class="ctrl-label">Fixation:</span>
+                <button class="mini-pill" data-bionic-delta="-1">Light</button>
+                <button class="mini-pill active" data-bionic-delta="0">Spec</button>
+                <button class="mini-pill" data-bionic-delta="1">Deep</button>
+              </div>
+
+              <!-- Mode 2 (Syntactic Chunking) specific controls -->
+              <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-chunking">
+                <span class="ctrl-label">Stanza Align:</span>
+                <button class="mini-pill active" data-stanza-align="left">Left Column</button>
+                <button class="mini-pill" data-stanza-align="center">Centered</button>
+              </div>
+
+              <!-- Mode 3 (RSVP + ORP) specific controls -->
+              <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-rsvp">
+                <span class="ctrl-label">RSVP Window:</span>
+                <button class="mini-pill active" data-rsvp-size="1">1 Word (ORP)</button>
+                <button class="mini-pill" data-rsvp-size="2">2 Words</button>
+              </div>
+
+              <!-- Mode 4 (Karaoke Spotlight) specific controls -->
+              <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-karaoke">
+                <span class="ctrl-label">Spotlight:</span>
+                <button class="mini-pill active" data-karaoke-layout="paragraph">Paragraphs</button>
+                <button class="mini-pill" data-karaoke-layout="stanza">Clauses</button>
+              </div>
+
+              <label class="toggle-chip" title="Automatically keep active spoken sentence centered">
+                <input type="checkbox" id="chk-autoscroll" checked />
+                <span>Auto-Center</span>
+              </label>
+
+              <div class="control-group">
+                <button class="mini-pill active" id="btn-quick-bw" title="Cycle Pure Black & White / Theme">
+                  ◐ Pure B&W (Black)
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Audio Stream & Sync Source -->
+          <div class="hub-section">
+            <div class="hub-section-label">3. AUDIO STREAM & SYNCHRONIZATION</div>
+            <div class="subbar-controls">
+              <div class="control-group">
+                <button class="mini-pill active" id="pill-source-youtube" data-audio-source="youtube">
+                  ▶ YouTube Audiobook
+                </button>
+                <button class="mini-pill" id="pill-source-webspeech" data-audio-source="webspeech">
+                  Web Speech TTS
+                </button>
+                <button class="mini-pill" id="pill-source-pacer" data-audio-source="pacer">
+                  Silent Pacer
+                </button>
+              </div>
+
+              <div class="sprint-timer-pill" id="sprint-timer-widget" title="Cognitive Focus Sprint Timer">
+                <svg class="sprint-ring" width="24" height="24" viewBox="0 0 36 36">
+                  <circle class="sprint-ring-bg" cx="18" cy="18" r="15" fill="none" stroke-width="3"></circle>
+                  <circle id="sprint-ring-progress" class="sprint-ring-fg" cx="18" cy="18" r="15" fill="none" stroke-width="3" stroke-dasharray="94.25" stroke-dashoffset="0"></circle>
+                </svg>
+                <div class="sprint-info">
+                  <span class="sprint-label">SPRINT</span>
+                  <span id="sprint-time-display" class="sprint-time">12:00</span>
+                </div>
+                <button id="btn-sprint-toggle" class="sprint-action-btn">Start</button>
+                <select id="sprint-duration-select" class="sprint-select">
+                  <option value="10">10m</option>
+                  <option value="12" selected>12m</option>
+                  <option value="15">15m</option>
+                  <option value="20">20m</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="sync-telemetry">
+              <span class="sync-indicator" id="sync-status-dot"></span>
+              <span id="sync-engine-badge" class="telemetry-item">YouTube json3 + 60Hz rAF</span>
+              <span class="telemetry-sep">·</span>
+              <span id="telemetry-word-pos" class="telemetry-item">Word 1 / 4122</span>
+              <span class="telemetry-sep">·</span>
+              <span id="telemetry-clause-pos" class="telemetry-item">Clause 1</span>
+              <span class="telemetry-sep">·</span>
+              <span id="telemetry-wpm" class="telemetry-item highlight">185 WPM</span>
+            </div>
+          </div>
+
+          <!-- 4. Quick Actions: Import, Font/Theme Settings -->
+          <div class="hub-section hub-actions-row">
+            <button id="btn-open-import" class="secondary-btn">
+              <span>+ Import EPUB / YouTube</span>
+            </button>
+            <button id="btn-toggle-settings" class="secondary-btn">
+              <span>Font Size, Themes & Voice Settings</span>
+            </button>
+          </div>
         </div>
-
-        <!-- Mode 2 (Syntactic Chunking) specific controls -->
-        <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-chunking">
-          <span class="ctrl-label">Stanza Align:</span>
-          <button class="mini-pill active" data-stanza-align="left">Left Column (400px)</button>
-          <button class="mini-pill" data-stanza-align="center">Centered Poetry</button>
-        </div>
-
-        <!-- Mode 3 (RSVP + ORP) specific controls -->
-        <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-rsvp">
-          <span class="ctrl-label">RSVP Window:</span>
-          <button class="mini-pill active" data-rsvp-size="1">1 Word (Pure ORP)</button>
-          <button class="mini-pill" data-rsvp-size="2">2-Word Micro-Chunk</button>
-        </div>
-
-        <!-- Mode 4 (Karaoke Spotlight) specific controls -->
-        <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-karaoke">
-          <span class="ctrl-label">Spotlight Structure:</span>
-          <button class="mini-pill active" data-karaoke-layout="paragraph">Full Paragraphs</button>
-          <button class="mini-pill" data-karaoke-layout="stanza">Chunked Clauses</button>
-        </div>
-
-        <label class="toggle-chip" title="Automatically keep active spoken sentence vertically centered in viewport">
-          <input type="checkbox" id="chk-autoscroll" checked />
-          <span>Auto-Center</span>
-        </label>
-
-        <div class="control-group">
-          <button class="mini-pill active" id="btn-quick-bw" title="Toggle Super-Contrasted Pure Black & White Theme">
-            ◐ Pure B&W (Black)
-          </button>
-        </div>
-      </div>
-
-      <!-- Real-Time Synchronization Telemetry HUD -->
-      <div class="sync-telemetry">
-        <span class="sync-indicator" id="sync-status-dot"></span>
-        <span id="sync-engine-badge" class="telemetry-item">YouTube json3 + 60Hz rAF</span>
-        <span class="telemetry-sep">·</span>
-        <span id="telemetry-word-pos" class="telemetry-item">Word 1 / 4122</span>
-        <span class="telemetry-sep">·</span>
-        <span id="telemetry-clause-pos" class="telemetry-item">Clause 1</span>
-        <span class="telemetry-sep">·</span>
-        <span id="telemetry-wpm" class="telemetry-item highlight">185 WPM</span>
       </div>
     </div>
 

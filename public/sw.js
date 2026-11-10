@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focusbooks-v2';
+const CACHE_NAME = 'focusbooks-v5';
 const CORE_ASSETS = [
   './',
   './index.html',
@@ -27,23 +27,21 @@ self.addEventListener('activate', (event) => {
   );
 });
 
+// Network-First with Offline Cache Fallback so iOS always receives UI updates immediately
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
   const url = new URL(event.request.url);
   if (url.pathname.includes('/api/')) return;
 
   event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const networkFetch = fetch(event.request)
-        .then((response) => {
-          if (response && response.status === 200 && url.origin === self.location.origin) {
-            const copy = response.clone();
-            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
-          }
-          return response;
-        })
-        .catch(() => cached);
-      return cached || networkFetch;
-    })
+    fetch(event.request)
+      .then((response) => {
+        if (response && response.status === 200 && url.origin === self.location.origin) {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy));
+        }
+        return response;
+      })
+      .catch(() => caches.match(event.request))
   );
 });
