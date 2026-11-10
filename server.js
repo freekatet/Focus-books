@@ -10,11 +10,17 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const BOOKS_DIR = path.join(PUBLIC_DIR, 'books');
 const YT_CACHE_DIR = path.join(BOOKS_DIR, 'yt-cache');
 const SAVED_BOOKS_DIR = path.join(BOOKS_DIR, 'saved');
+const COVERS_DIR = path.join(BOOKS_DIR, 'covers');
 const LIBRARY_INDEX_PATH = path.join(BOOKS_DIR, 'library.json');
 const DEFAULT_DESKTOP_EPUB = '/Users/frexkatet/Desktop/The Three Stigmata of Palmer Eldritch.epub';
+const APPLE_BOOKS_ICLOUD_DIR = path.join(
+  os.homedir(),
+  'Library/Mobile Documents/iCloud~com~apple~iBooks/Documents'
+);
 
 fs.mkdirSync(YT_CACHE_DIR, { recursive: true });
 fs.mkdirSync(SAVED_BOOKS_DIR, { recursive: true });
+fs.mkdirSync(COVERS_DIR, { recursive: true });
 
 const MIME_TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -24,6 +30,7 @@ const MIME_TYPES = {
   '.jpeg': 'image/jpeg',
   '.jpg': 'image/jpeg',
   '.png': 'image/png',
+  '.bmp': 'image/bmp',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.wav': 'audio/wav',
@@ -88,14 +95,14 @@ function saveLibraryState(libState) {
   fs.writeFileSync(LIBRARY_INDEX_PATH, JSON.stringify(libState, null, 2), 'utf-8');
 }
 
-function registerOrUpdateBookInLibrary(bookData, sourceType = 'epub') {
+function registerOrUpdateBookInLibrary(bookData, sourceType = 'epub', keepActiveId = false) {
   const lib = loadLibraryState();
   const safeId = (bookData.id || `book-${Date.now()}`).replace(/[^a-zA-Z0-9_-]/g, '-');
   bookData.id = safeId;
 
-  let dataUrl = `/books/saved/${safeId}.json`;
+  let dataUrl = `./books/saved/${safeId}.json`;
   if (safeId === 'palmer-eldritch') {
-    dataUrl = '/books/palmer-eldritch/book.json';
+    dataUrl = './books/palmer-eldritch/book.json';
     fs.writeFileSync(path.join(BOOKS_DIR, 'palmer-eldritch', 'book.json'), JSON.stringify(bookData), 'utf-8');
   } else {
     fs.writeFileSync(path.join(SAVED_BOOKS_DIR, `${safeId}.json`), JSON.stringify(bookData), 'utf-8');
@@ -115,7 +122,7 @@ function registerOrUpdateBookInLibrary(bookData, sourceType = 'epub') {
     id: safeId,
     title: bookData.title || 'Untitled Book',
     author: bookData.author || 'Unknown Author',
-    coverUrl: bookData.coverUrl || '/books/palmer-eldritch/cover.jpeg',
+    coverUrl: bookData.coverUrl || './books/palmer-eldritch/cover.jpeg',
     sourceType: detectedSourceType,
     youtubeVideoId: bookData.youtubeVideoId || '',
     youtubeUrl: bookData.youtubeUrl || '',
@@ -142,10 +149,12 @@ function registerOrUpdateBookInLibrary(bookData, sourceType = 'epub') {
   if (existingIdx >= 0) {
     lib.books[existingIdx] = summaryEntry;
   } else {
-    lib.books.unshift(summaryEntry);
+    lib.books.push(summaryEntry);
   }
 
-  lib.lastActiveBookId = safeId;
+  if (!keepActiveId) {
+    lib.lastActiveBookId = safeId;
+  }
   saveLibraryState(lib);
   return summaryEntry;
 }
@@ -184,6 +193,7 @@ function stripHtmlTags(html) {
     .replace(/<br\s*\/?>/gi, ' ')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ')
+    .replace(/&#160;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
@@ -195,23 +205,34 @@ function stripHtmlTags(html) {
 
 function extractParagraphsFromXhtml(xhtml) {
   const bodyMatch = xhtml.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
-  const content = bodyMatch ? bodyMatch[1] : xhtml;
-  const paragraphs = [];
+  let content = bodyMatch ? bodyMatch[1] : xhtml;
+  content = content.replace(/<(script|style|svg)[^>]*>[\s\S]*?<\/\1>/gi, '');
+
+  const pParagraphs = [];
   const blockRegex = /<(p|h1|h2|h3|h4|blockquote)[^>]*>([\s\S]*?)<\/\1>/gi;
   let match;
   while ((match = blockRegex.exec(content)) !== null) {
     const text = stripHtmlTags(match[2]);
     if (text && text !== '\u00a0') {
-      paragraphs.push(text);
+      pParagraphs.push(text);
     }
   }
-  return paragraphs;
+
+  const leafDivParagraphs = [];
+  const leafBlockRegex = /<(p|h1|h2|h3|h4|blockquote|div|li)[^>]*>((?:(?!<(?:p|h1|h2|h3|h4|blockquote|div|li)\b)[\s\S])*?)<\/\1>/gi;
+  while ((match = leafBlockRegex.exec(content)) !== null) {
+    const text = stripHtmlTags(match[2]);
+    if (text && text !== '\u00a0') {
+      leafDivParagraphs.push(text);
+    }
+  }
+
+  const pWords = pParagraphs.reduce((s, p) => s + p.split(/\s+/).length, 0);
+  const divWords = leafDivParagraphs.reduce((s, p) => s + p.split(/\s+/).length, 0);
+  return divWords > pWords * 1.2 ? leafDivParagraphs : pParagraphs;
 }
 
 function findOpfFile(epubDir) {
-  const directOpf = path.join(epubDir, 'content.opf');
-  if (fs.existsSync(directOpf)) return directOpf;
-
   const containerXmlPath = path.join(epubDir, 'META-INF', 'container.xml');
   if (fs.existsSync(containerXmlPath)) {
     const xml = fs.readFileSync(containerXmlPath, 'utf-8');
@@ -221,7 +242,116 @@ function findOpfFile(epubDir) {
       if (fs.existsSync(candidate)) return candidate;
     }
   }
+  const directOpf = path.join(epubDir, 'content.opf');
+  if (fs.existsSync(directOpf)) return directOpf;
   return null;
+}
+
+function extractOrGenerateCoverForBook(bookId, title, author, epubPath, baseDir, manifest) {
+  if (bookId === 'palmer-eldritch' || bookId === 'the-three-stigmata-of-palmer-eldritch') {
+    return './books/palmer-eldritch/cover.jpeg';
+  }
+
+  let foundCoverPath = null;
+  for (const d of [epubPath, baseDir]) {
+    for (const f of ['cover.jpeg', 'cover.jpg', 'cover.png', 'images/cover.jpg', 'images/cover.jpeg', 'Images/cover.jpg', 'images/cover.bmp']) {
+      const p = path.join(d, f);
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        foundCoverPath = p;
+        break;
+      }
+    }
+    if (foundCoverPath) break;
+  }
+
+  if (!foundCoverPath) {
+    const items = Object.values(manifest);
+    const coverItem =
+      items.find((it) => it.mediaType.startsWith('image/') && /cover/i.test(`${it.id} ${it.href} ${it.props || ''}`)) ||
+      items.find((it) => it.mediaType.startsWith('image/'));
+    if (coverItem) {
+      const p = path.join(baseDir, coverItem.href);
+      if (fs.existsSync(p) && fs.statSync(p).isFile()) {
+        foundCoverPath = p;
+      }
+    }
+  }
+
+  if (foundCoverPath) {
+    const ext = path.extname(foundCoverPath).toLowerCase() || '.jpg';
+    const destName = `${bookId}${ext}`;
+    const destPath = path.join(COVERS_DIR, destName);
+    try {
+      fs.copyFileSync(foundCoverPath, destPath);
+      return `./books/covers/${destName}`;
+    } catch (_) {}
+  }
+
+  // Generate a stylized SVG book cover when the EPUB does not embed an image
+  const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+  const words = String(title).split(/\s+/);
+  const lines = [];
+  let cur = '';
+  for (const w of words) {
+    if ((cur + ' ' + w).trim().length > 16 && cur) {
+      lines.push(cur);
+      cur = w;
+    } else {
+      cur = (cur + ' ' + w).trim();
+    }
+  }
+  if (cur) lines.push(cur);
+  const titleSvg = lines
+    .slice(0, 4)
+    .map((ln, idx) => `<tspan x="150" dy="${idx === 0 ? 0 : 34}">${esc(ln)}</tspan>`)
+    .join('');
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 450" width="300" height="450">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#141824"/>
+      <stop offset="100%" stop-color="#090b10"/>
+    </linearGradient>
+  </defs>
+  <rect width="300" height="450" rx="12" fill="url(#bg)" stroke="#f59e0b" stroke-width="3"/>
+  <rect x="18" y="18" width="264" height="414" rx="6" fill="none" stroke="rgba(245,158,11,0.3)" stroke-width="1.5"/>
+  <text x="150" y="140" text-anchor="middle" fill="#f8fafc" font-family="Georgia, serif" font-size="26" font-weight="bold">${titleSvg}</text>
+  <line x1="90" y1="295" x2="210" y2="295" stroke="#f59e0b" stroke-width="2"/>
+  <text x="150" y="335" text-anchor="middle" fill="#f59e0b" font-family="system-ui, sans-serif" font-size="16" font-weight="600">${esc(author)}</text>
+  <text x="150" y="405" text-anchor="middle" fill="#64748b" font-family="monospace" font-size="11" letter-spacing="2">APPLE BOOKS EDITION</text>
+</svg>`;
+  const svgName = `${bookId}.svg`;
+  fs.writeFileSync(path.join(COVERS_DIR, svgName), svg, 'utf-8');
+  return `./books/covers/${svgName}`;
+}
+
+function splitParagraphsByInternalChapters(paras, fallbackTitle) {
+  const wordCount = paras.reduce((s, p) => s + p.split(/\s+/).filter(Boolean).length, 0);
+  if (wordCount < 4500) {
+    return [{ title: fallbackTitle, paragraphs: paras }];
+  }
+
+  const chapterHeadingRegex = /^(?:CHAPTER|BOOK|PART)\s+(?:[IVXLCDM]+|\d+|ONE|TWO|THREE|FOUR|FIVE|SIX|SEVEN|EIGHT|NINE|TEN|ELEVEN|TWELVE|THIRTEEN|FOURTEEN|FIFTEEN|SIXTEEN|SEVENTEEN|EIGHTEEN|NINETEEN|TWENTY)\b(?:\s*[:.-]?\s*.*)?$/i;
+  const sections = [];
+  let currentTitle = fallbackTitle;
+  let currentParas = [];
+
+  for (const p of paras) {
+    const trimmed = p.trim();
+    if (trimmed.length <= 75 && chapterHeadingRegex.test(trimmed)) {
+      if (currentParas.length > 0) {
+        sections.push({ title: currentTitle, paragraphs: currentParas });
+        currentParas = [];
+      }
+      currentTitle = trimmed;
+    } else {
+      currentParas.push(p);
+    }
+  }
+  if (currentParas.length > 0) {
+    sections.push({ title: currentTitle, paragraphs: currentParas });
+  }
+  return sections.length > 1 ? sections : [{ title: fallbackTitle, paragraphs: paras }];
 }
 
 function parseUnpackedEpubDir(epubPath) {
@@ -234,8 +364,17 @@ function parseUnpackedEpubDir(epubPath) {
 
   const titleMatch = opfXml.match(/<dc:title[^>]*>([\s\S]*?)<\/dc:title>/i);
   const creatorMatch = opfXml.match(/<dc:creator[^>]*>([\s\S]*?)<\/dc:creator>/i);
-  const title = titleMatch ? stripHtmlTags(titleMatch[1]) : path.basename(epubPath, '.epub');
-  const author = creatorMatch ? stripHtmlTags(creatorMatch[1]) : 'Unknown Author';
+  let title = titleMatch ? stripHtmlTags(titleMatch[1]) : path.basename(epubPath, '.epub');
+  let author = creatorMatch ? stripHtmlTags(creatorMatch[1]) : 'Unknown Author';
+
+  if (title.toLowerCase() === 'annilihation' || title.toLowerCase() === 'annihilation') {
+    title = 'Annihilation';
+    if (author === 'Unknown' || author === 'Unknown Author') author = 'Jeff VanderMeer';
+  }
+  if (author.includes(',')) {
+    const parts = author.split(',').map((s) => s.trim());
+    if (parts.length === 2) author = `${parts[1]} ${parts[0]}`;
+  }
 
   const manifest = {};
   const itemRegex = /<item\s+([^>]+?)\/?>/gi;
@@ -245,11 +384,13 @@ function parseUnpackedEpubDir(epubPath) {
     const idMatch = attrs.match(/id=["']([^"']+)["']/i);
     const hrefMatch = attrs.match(/href=["']([^"']+)["']/i);
     const mediaMatch = attrs.match(/media-type=["']([^"']+)["']/i);
+    const propMatch = attrs.match(/properties=["']([^"']+)["']/i);
     if (idMatch && hrefMatch) {
       manifest[idMatch[1]] = {
         id: idMatch[1],
         href: decodeURIComponent(hrefMatch[1]),
-        mediaType: mediaMatch ? mediaMatch[1] : ''
+        mediaType: mediaMatch ? mediaMatch[1] : '',
+        props: propMatch ? propMatch[1] : ''
       };
     }
   }
@@ -326,28 +467,61 @@ function parseUnpackedEpubDir(epubPath) {
       chapTitle = 'Epigraph';
     }
 
-    const wordCount = paras.reduce((sum, p) => sum + p.split(/\s+/).filter(Boolean).length, 0);
-    if (wordCount === 0) continue;
+    const subSections = splitParagraphsByInternalChapters(paras, chapTitle);
+    for (const sec of subSections) {
+      const wordCount = sec.paragraphs.reduce((sum, p) => sum + p.split(/\s+/).filter(Boolean).length, 0);
+      if (wordCount === 0) continue;
 
-    totalWords += wordCount;
-    chapters.push({
-      id: `ch_${chapterIndex++}`,
-      title: chapTitle,
-      wordCount,
-      paragraphs: paras
-    });
+      totalWords += wordCount;
+      chapters.push({
+        id: `ch_${chapterIndex++}`,
+        title: sec.title,
+        wordCount,
+        paragraphs: sec.paragraphs
+      });
+    }
   }
 
+  const rawId = path.basename(epubPath, '.epub').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const bookId = rawId === 'the-three-stigmata-of-palmer-eldritch' ? 'palmer-eldritch' : rawId;
+  const coverUrl = extractOrGenerateCoverForBook(bookId, title, author, epubPath, baseDir, manifest);
+
   return {
-    id: path.basename(epubPath, '.epub').toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+    id: bookId,
     title,
     author,
     language: 'en-US',
     sourcePath: epubPath,
-    coverUrl: '/books/palmer-eldritch/cover.jpeg',
+    coverUrl,
     totalWords,
     chapters
   };
+}
+
+function syncAppleBooksLibrary() {
+  if (!fs.existsSync(APPLE_BOOKS_ICLOUD_DIR)) {
+    throw new Error(`Apple Books iCloud directory not found at ${APPLE_BOOKS_ICLOUD_DIR}`);
+  }
+  const entries = fs.readdirSync(APPLE_BOOKS_ICLOUD_DIR).filter((name) => name.endsWith('.epub'));
+  const imported = [];
+
+  for (const name of entries) {
+    const fullPath = path.join(APPLE_BOOKS_ICLOUD_DIR, name);
+    try {
+      const stat = fs.statSync(fullPath);
+      if (!stat.isDirectory()) continue;
+      // Preserve our YouTube-synced Palmer Eldritch book so we don't overwrite its 70,309 word timestamps
+      if (name.toLowerCase().includes('palmer eldritch')) continue;
+      const bookData = parseUnpackedEpubDir(fullPath);
+      if (bookData.totalWords > 0 && bookData.chapters.length > 0) {
+        const summary = registerOrUpdateBookInLibrary(bookData, 'epub', true);
+        imported.push(summary);
+      }
+    } catch (err) {
+      console.warn(`Skipped ${name}: ${err.message}`);
+    }
+  }
+  return { count: imported.length, books: imported, library: loadLibraryState() };
 }
 
 /* ============================================================================
@@ -794,6 +968,19 @@ const server = http.createServer(async (req, res) => {
       registerOrUpdateBookInLibrary(alignedBook, 'epub+youtube');
       res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
       res.end(JSON.stringify(alignedBook));
+    } catch (err) {
+      res.writeHead(500, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: err.message }));
+    }
+    return;
+  }
+
+  // API 4: Sync Apple Books (Mac iCloud Books Container -> FocusBooks Library for Mac & iOS)
+  if (pathname === '/api/sync-apple-books' && (req.method === 'POST' || req.method === 'GET')) {
+    try {
+      const result = syncAppleBooksLibrary();
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify(result));
     } catch (err) {
       res.writeHead(500, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ error: err.message }));

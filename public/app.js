@@ -425,6 +425,12 @@
     await fetchLibraryIndex();
   }
 
+  function normalizeRelativeAssetUrl(url) {
+    if (!url) return '';
+    if (url.startsWith('/books/')) return '.' + url;
+    return url;
+  }
+
   function renderLibraryModal() {
     el.libraryCardsContainer.innerHTML = '';
     const books = state.library.books || [];
@@ -438,7 +444,7 @@
     const sourceLabels = {
       'epub+youtube': 'EPUB + YouTube Sync',
       youtube: 'YouTube Captions',
-      epub: 'EPUB Book',
+      epub: 'Apple Books / EPUB',
       text: 'Custom Text'
     };
 
@@ -447,12 +453,13 @@
       const prog = b.progress || { chapterIndex: 0, chapterTitle: 'Chapter 1', tokenIndex: 0, overallProgressPct: 0, videoTimeMs: 0 };
       const pct = prog.overallProgressPct || 0;
       const timeStr = prog.videoTimeMs ? ` · Audio ${formatTimeMMSS(prog.videoTimeMs / 1000)}` : '';
+      const coverSrc = normalizeRelativeAssetUrl(b.coverUrl) || './books/palmer-eldritch/cover.jpeg';
 
       const card = document.createElement('div');
       card.className = 'library-card' + (isCurrent ? ' active-book' : '');
       card.innerHTML = `
         <div class="library-card-left">
-          <img src="${b.coverUrl || '/books/palmer-eldritch/cover.jpeg'}" alt="Cover" class="library-cover" />
+          <img src="${coverSrc}" alt="Cover" class="library-cover" />
           <div class="library-info">
             <div class="library-title-row">
               <span class="library-book-title">${escapeHtml(b.title)}</span>
@@ -488,7 +495,7 @@
           showToast(`Loading "${b.title}"...`);
           let fullBook = await window.EpubLoader.getBookFromIndexedDB(b.id);
           if (!fullBook && b.dataUrl) {
-            const res = await fetch(b.dataUrl);
+            const res = await fetch(normalizeRelativeAssetUrl(b.dataUrl));
             if (res.ok) fullBook = await res.json();
           }
           if (!fullBook) throw new Error('Could not load saved book data');
@@ -546,7 +553,7 @@
       try {
         let bookData = await window.EpubLoader.getBookFromIndexedDB(targetEntry.id);
         if (!bookData && targetEntry.dataUrl) {
-          const res = await fetch(targetEntry.dataUrl);
+          const res = await fetch(normalizeRelativeAssetUrl(targetEntry.dataUrl));
           if (res.ok) bookData = await res.json();
         }
         if (bookData) {
@@ -577,7 +584,7 @@
     el.stageBookTitle.textContent = (bookData.title || 'BOOK').toUpperCase();
 
     if (bookData.coverUrl) {
-      el.bookCoverThumb.src = bookData.coverUrl;
+      el.bookCoverThumb.src = normalizeRelativeAssetUrl(bookData.coverUrl);
       el.bookCoverThumb.classList.remove('hidden');
     } else {
       el.bookCoverThumb.classList.add('hidden');
@@ -2105,6 +2112,24 @@
       el.modalLibrary.classList.add('hidden');
       el.modalImport.classList.remove('hidden');
     });
+    const btnSyncAppleBooks = document.getElementById('btn-sync-apple-books');
+    if (btnSyncAppleBooks) {
+      btnSyncAppleBooks.addEventListener('click', async () => {
+        try {
+          showToast('Scanning iCloud Apple Books folder...');
+          const res = await fetch('./api/sync-apple-books', { method: 'POST' });
+          if (!res.ok) {
+            throw new Error('Apple Books sync requires the local Mac server, or books are already pre-synced!');
+          }
+          const data = await res.json();
+          await fetchLibraryIndex();
+          renderLibraryModal();
+          showToast(`Synced ${data.count} Apple Books into Library!`);
+        } catch (err) {
+          showToast(err.message);
+        }
+      });
+    }
 
     // Import Modal
     document.getElementById('btn-open-import').addEventListener('click', () => {
