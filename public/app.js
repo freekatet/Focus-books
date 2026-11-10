@@ -535,9 +535,19 @@
     loadYouTubeIframeAPI();
     updateSprintTimerDisplay();
 
-    // Register Service Worker for offline iOS PWA support
+    // Register Service Worker for offline iOS PWA support & auto-refresh when updated
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('./sw.js').catch(() => {});
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+      navigator.serviceWorker
+        .register('./sw.js?v=6')
+        .then((reg) => reg.update())
+        .catch(() => {});
     }
 
     // Flush playhead state if user closes or refreshes tab
