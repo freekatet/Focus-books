@@ -2001,3 +2001,60 @@ html, body {
     justify-content: flex-end;
   }
 }
+
+/* ============================================================================
+ * OLED POCKET LOCK OVERLAY (0% OLED BATTERY DRAW + TOUCH LOCK FOR POCKET AUDIO)
+ * ============================================================================ */
+
+.pocket-lock-btn {
+  font-size: 14px;
+}
+
+.pocket-lock-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #000000;
+  color: #333333;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.pocket-lock-inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 24px;
+}
+
+.pocket-lock-icon {
+  font-size: 26px;
+  opacity: 0.35;
+}
+
+.pocket-lock-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #3a3a3a;
+}
+
+.pocket-lock-sub {
+  font-size: 12px;
+  color: #282828;
+}
+
+.pocket-lock-unlock-hint {
+  margin-top: 14px;
+  font-size: 11px;
+  color: #242424;
+  border: 1px solid #1a1a1a;
+  padding: 6px 14px;
+  border-radius: 999px;
+}
+

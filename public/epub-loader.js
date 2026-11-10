@@ -777,53 +777,6 @@
     return clonedBook;
   }
 
-  const streamUrlCache = {};
-  const DEFAULT_STREAM_GATEWAY = 'https://sat-say-comment-dramatically.trycloudflare.com';
-
-  function getStreamBackendBase() {
-    const custom = localStorage.getItem('focusbooks_stream_gateway');
-    if (custom) return custom.replace(/\/+$/, '');
-    const host = window.location.hostname || '';
-    if (host.includes('github.io')) {
-      return DEFAULT_STREAM_GATEWAY;
-    }
-    return '';
-  }
-
-  function getDirectYouTubeAudioStreamUrl(videoId) {
-    if (!videoId) return null;
-    if (streamUrlCache[videoId]) return streamUrlCache[videoId];
-    const base = getStreamBackendBase();
-    const url = base
-      ? `${base}/api/youtube-audio?v=${encodeURIComponent(videoId)}`
-      : `./api/youtube-audio?v=${encodeURIComponent(videoId)}`;
-    streamUrlCache[videoId] = url;
-    return url;
-  }
-
-  async function resolveYouTubeAudioStreamUrl(videoId) {
-    if (!videoId) return null;
-    const base = getStreamBackendBase();
-    const prewarmEndpoint = base
-      ? `${base}/api/youtube-stream?v=${encodeURIComponent(videoId)}`
-      : `./api/youtube-stream?v=${encodeURIComponent(videoId)}`;
-
-    try {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), 8000);
-      const res = await fetch(prewarmEndpoint, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.streamUrl) {
-          streamUrlCache[videoId] = data.streamUrl;
-          return data.streamUrl;
-        }
-      }
-    } catch (_) {}
-
-    return getDirectYouTubeAudioStreamUrl(videoId);
-  }
-
   global.EpubLoader = {
     saveBookToIndexedDB,
     getBookFromIndexedDB,
@@ -838,8 +791,6 @@
     parseVttOrSrtToTimedWords,
     extractTimedWordsFromJson3,
     buildStandaloneBookFromYouTubeCaptions,
-    alignYouTubeToBookClientSide,
-    getDirectYouTubeAudioStreamUrl,
-    resolveYouTubeAudioStreamUrl
+    alignYouTubeToBookClientSide
   };
 })(window);

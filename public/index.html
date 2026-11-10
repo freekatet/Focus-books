@@ -451,6 +451,10 @@
             <line x1="19" y1="5" x2="19" y2="19"></line>
           </svg>
         </button>
+
+        <button id="btn-pocket-lock" class="transport-icon-btn pocket-lock-btn" title="Pocket Lock / OLED Blackout Screen (Keep YouTube playing in pocket)">
+          🔒
+        </button>
       </div>
 
       <div class="transport-center">
@@ -585,11 +589,21 @@
       </div>
     </div>
 
+    <!-- OLED Pocket Lock Overlay (Keeps iOS YouTube Audio Alive in Pocket with 0% OLED Power) -->
+    <div id="pocket-lock-overlay" class="pocket-lock-overlay hidden">
+      <div class="pocket-lock-inner">
+        <div class="pocket-lock-icon">🔒</div>
+        <div class="pocket-lock-title">Pocket Audio Mode Active</div>
+        <div id="pocket-lock-chapter" class="pocket-lock-sub">Keep screen in pocket · OLED pixels off</div>
+        <div class="pocket-lock-unlock-hint">Double-tap anywhere to unlock screen</div>
+      </div>
+    </div>
+
     <div id="toast-banner" class="toast-banner hidden"></div>
   </div>
 
-  <script src="./cognitive-engine.js?v=11"></script>
-  <script src="./epub-loader.js?v=11"></script>
-  <script src="./app.js?v=11"></script>
+  <script src="./cognitive-engine.js?v=12"></script>
+  <script src="./epub-loader.js?v=12"></script>
+  <script src="./app.js?v=12"></script>
 </body>
 </html>

@@ -548,7 +548,7 @@
         }
       });
       navigator.serviceWorker
-        .register('./sw.js?v=11')
+        .register('./sw.js?v=12')
         .then((reg) => reg.update())
         .catch(() => {});
     }
@@ -674,25 +674,6 @@
 
     el.ytDockPanel.classList.toggle('hidden', state.audioEngine !== 'youtube');
 
-    // Dynamically resolve a live direct <audio> stream URL on the fly for ANY YouTube video (zero pre-downloaded files!)
-    if (window.EpubLoader) {
-      if (typeof window.EpubLoader.getDirectYouTubeAudioStreamUrl === 'function') {
-        state.liveYoutubeStreamUrl = window.EpubLoader.getDirectYouTubeAudioStreamUrl(videoId);
-        if (state.liveYoutubeStreamUrl && state.htmlAudio && state.htmlAudio.dataset.loadedSrc !== state.liveYoutubeStreamUrl) {
-          state.htmlAudio.src = state.liveYoutubeStreamUrl;
-          state.htmlAudio.dataset.loadedSrc = state.liveYoutubeStreamUrl;
-        }
-      }
-      if (typeof window.EpubLoader.resolveYouTubeAudioStreamUrl === 'function' && state.resolvedStreamVideoId !== videoId) {
-        state.resolvedStreamVideoId = videoId;
-        window.EpubLoader.resolveYouTubeAudioStreamUrl(videoId).then((streamUrl) => {
-          if (streamUrl && state.book?.youtubeVideoId === videoId) {
-            state.liveYoutubeStreamUrl = streamUrl;
-          }
-        });
-      }
-    }
-
     if (!state.ytApiReady) {
       state.currentVideoId = videoId;
       return;
@@ -734,16 +715,12 @@
           if (state.audioEngine !== 'youtube' || state.usingNativeChapterAudio) return;
 
           if (event.data === 1) {
-            // If user tapped inside the YouTube player widget directly, route through native Lock-Screen-safe <audio> if available
-            if (state.liveYoutubeStreamUrl) {
-              startPlayback();
-              return;
-            }
             if (!state.isPlaying) {
               state.isPlaying = true;
               el.iconPlay.classList.add('hidden');
               el.iconPause.classList.remove('hidden');
               el.syncStatusDot.classList.add('playing');
+              requestScreenWakeLock();
               updateLockScreenMediaSession();
               runYouTubeSyncLoop();
             }
@@ -1354,6 +1331,26 @@
     } catch (_) {}
   }
 
+  async function requestScreenWakeLock() {
+    if (!('wakeLock' in navigator) || ! navigator.wakeLock) return;
+    try {
+      if (state.wakeLockSentinel) return;
+      state.wakeLockSentinel = await navigator.wakeLock.request('screen');
+      state.wakeLockSentinel.addEventListener('release', () => {
+        state.wakeLockSentinel = null;
+      });
+    } catch (_) {}
+  }
+
+  function releaseScreenWakeLock() {
+    if (state.wakeLockSentinel) {
+      try {
+        state.wakeLockSentinel.release();
+      } catch (_) {}
+      state.wakeLockSentinel = null;
+    }
+  }
+
   function startPlayback() {
     if (!state.parsedChapter || state.parsedChapter.tokens.length === 0) return;
 
@@ -1363,6 +1360,7 @@
     el.iconPause.classList.remove('hidden');
     el.syncStatusDot.classList.add('playing');
 
+    requestScreenWakeLock();
     updateLockScreenMediaSession();
     speakAndSyncFromToken(state.activeTokenIndex);
   }
@@ -1370,6 +1368,7 @@
   function stopPlayback() {
     state.isPlaying = false;
     state.usingNativeChapterAudio = false;
+    releaseScreenWakeLock();
     el.iconPlay.classList.remove('hidden');
     el.iconPause.classList.add('hidden');
     el.syncStatusDot.classList.remove('playing');
@@ -2069,6 +2068,40 @@
     const optionsHubBackdrop = document.getElementById('options-hub-backdrop');
     const btnToggleOptionsHub = document.getElementById('btn-toggle-options-hub');
     const btnCloseOptionsHub = document.getElementById('btn-close-options-hub');
+    const btnPocketLock = document.getElementById('btn-pocket-lock');
+    const pocketLockOverlay = document.getElementById('pocket-lock-overlay');
+    const pocketLockChapter = document.getElementById('pocket-lock-chapter');
+
+    if (btnPocketLock && pocketLockOverlay) {
+      btnPocketLock.addEventListener('click', () => {
+        if (!state.isPlaying) {
+          startPlayback();
+        } else {
+          requestScreenWakeLock();
+        }
+        if (pocketLockChapter && state.parsedChapter) {
+          pocketLockChapter.textContent = `${state.book?.title || 'Book'} · ${state.parsedChapter.title}`;
+        }
+        pocketLockOverlay.classList.remove('hidden');
+      });
+
+      let lastPocketTap = 0;
+      pocketLockOverlay.addEventListener('click', () => {
+        const now = Date.now();
+        if (now - lastPocketTap < 420) {
+          pocketLockOverlay.classList.add('hidden');
+          lastPocketTap = 0;
+        } else {
+          lastPocketTap = now;
+        }
+      });
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && state.isPlaying) {
+        requestScreenWakeLock();
+      }
+    });
 
     if (btnToggleOptionsHub && optionsHubBackdrop) {
       btnToggleOptionsHub.addEventListener('click', () => {
