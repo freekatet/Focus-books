@@ -287,17 +287,37 @@
         </div>
       </main>
 
-      <!-- Floating / Dockable YouTube Audio-Video Sync Player (Option C) -->
+      <!-- Floating / Draggable YouTube Audio-Video Sync Player (Option C) -->
       <div id="yt-dock-panel" class="yt-dock-panel">
-        <div class="yt-dock-header">
+        <div id="yt-dock-header" class="yt-dock-header" title="Drag to move player anywhere on screen">
           <div class="yt-dock-title-group">
+            <span class="yt-drag-handle">⠿</span>
             <span class="yt-live-dot"></span>
-            <span class="yt-dock-title">YouTube Audiobook Sync</span>
+            <span class="yt-dock-title">YouTube Sync</span>
           </div>
           <div class="yt-dock-actions">
             <span id="yt-time-readout" class="yt-time-readout">00:30.8</span>
+            <button id="btn-toggle-yt-size" class="icon-btn-sm" title="Toggle Larger / Standard Video Size">⤢</button>
             <button id="btn-toggle-yt-minimize" class="icon-btn-sm" title="Minimize / Expand Video Frame">_</button>
           </div>
+        </div>
+        <!-- Built-in Speed & Nudge Bar directly on the YouTube Player -->
+        <div class="yt-dock-controls">
+          <span class="yt-ctrl-label">Speed:</span>
+          <button type="button" class="mini-pill" id="btn-yt-speed-down" title="Slower (-0.05x)">−</button>
+          <select id="sel-yt-speed" class="yt-speed-select" title="YouTube & Reader Playback Speed">
+            <option value="0.75">0.75x</option>
+            <option value="0.9">0.90x</option>
+            <option value="1" selected>1.00x</option>
+            <option value="1.1">1.10x</option>
+            <option value="1.2">1.20x</option>
+            <option value="1.25">1.25x</option>
+            <option value="1.3">1.30x</option>
+            <option value="1.5">1.50x</option>
+            <option value="1.75">1.75x</option>
+            <option value="2">2.00x</option>
+          </select>
+          <button type="button" class="mini-pill" id="btn-yt-speed-up" title="Faster (+0.05x)">+</button>
         </div>
         <div id="yt-player-body" class="yt-player-body">
           <div id="yt-iframe-mount"></div>

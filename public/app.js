@@ -1713,6 +1713,19 @@
     el.speedValueBadge.textContent = `${clamped.toFixed(2)}x`;
     el.rngSpeed.value = String(clamped);
 
+    const selYtSpeed = document.getElementById('sel-yt-speed');
+    if (selYtSpeed) {
+      const strVal = String(clamped);
+      let opt = Array.from(selYtSpeed.options).find((o) => Math.abs(Number(o.value) - clamped) < 0.01);
+      if (!opt) {
+        opt = document.createElement('option');
+        opt.value = strVal;
+        opt.textContent = `${clamped.toFixed(2)}x`;
+        selYtSpeed.appendChild(opt);
+      }
+      selYtSpeed.value = opt.value;
+    }
+
     el.speedPresets.forEach((btn) => {
       btn.classList.toggle('active', Math.abs(Number(btn.dataset.speed) - clamped) < 0.01);
     });
@@ -1790,6 +1803,108 @@
       el.ytDockPanel.classList.toggle('minimized');
       el.btnToggleYtMinimize.textContent = el.ytDockPanel.classList.contains('minimized') ? '□' : '_';
     });
+
+    const btnToggleYtSize = document.getElementById('btn-toggle-yt-size');
+    if (btnToggleYtSize) {
+      btnToggleYtSize.addEventListener('click', () => {
+        el.ytDockPanel.classList.remove('minimized');
+        el.btnToggleYtMinimize.textContent = '_';
+        el.ytDockPanel.classList.toggle('large');
+        clampYtDockInsideViewport();
+      });
+    }
+
+    const btnYtSpeedDown = document.getElementById('btn-yt-speed-down');
+    const btnYtSpeedUp = document.getElementById('btn-yt-speed-up');
+    const selYtSpeed = document.getElementById('sel-yt-speed');
+    if (btnYtSpeedDown) {
+      btnYtSpeedDown.addEventListener('click', () => setSpeed(state.speed - 0.1, true));
+    }
+    if (btnYtSpeedUp) {
+      btnYtSpeedUp.addEventListener('click', () => setSpeed(state.speed + 0.1, true));
+    }
+    if (selYtSpeed) {
+      selYtSpeed.addEventListener('change', (e) => setSpeed(Number(e.target.value), true));
+    }
+
+    // Draggable YouTube Player (Mouse + Touch via Pointer Events)
+    const ytDockHeader = document.getElementById('yt-dock-header');
+    function clampYtDockInsideViewport() {
+      if (!el.ytDockPanel || el.ytDockPanel.classList.contains('hidden')) return;
+      if (!el.ytDockPanel.style.left || !el.ytDockPanel.style.top) return;
+      const rect = el.ytDockPanel.getBoundingClientRect();
+      const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+      const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+      const clampedX = Math.min(Math.max(8, parseFloat(el.ytDockPanel.style.left) || 8), maxX);
+      const clampedY = Math.min(Math.max(8, parseFloat(el.ytDockPanel.style.top) || 8), maxY);
+      el.ytDockPanel.style.left = `${clampedX}px`;
+      el.ytDockPanel.style.top = `${clampedY}px`;
+      el.ytDockPanel.style.right = 'auto';
+      el.ytDockPanel.style.bottom = 'auto';
+    }
+
+    try {
+      const savedPos = JSON.parse(localStorage.getItem('focusbooks_yt_pos') || 'null');
+      if (savedPos && typeof savedPos.left === 'number' && typeof savedPos.top === 'number') {
+        el.ytDockPanel.style.left = `${savedPos.left}px`;
+        el.ytDockPanel.style.top = `${savedPos.top}px`;
+        el.ytDockPanel.style.right = 'auto';
+        el.ytDockPanel.style.bottom = 'auto';
+        setTimeout(clampYtDockInsideViewport, 100);
+      }
+    } catch (_) {}
+
+    if (ytDockHeader && el.ytDockPanel) {
+      let isDragging = false;
+      let dragOffsetX = 0;
+      let dragOffsetY = 0;
+
+      ytDockHeader.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button') || e.target.closest('select')) return;
+        isDragging = true;
+        const rect = el.ytDockPanel.getBoundingClientRect();
+        dragOffsetX = e.clientX - rect.left;
+        dragOffsetY = e.clientY - rect.top;
+        el.ytDockPanel.style.left = `${rect.left}px`;
+        el.ytDockPanel.style.top = `${rect.top}px`;
+        el.ytDockPanel.style.right = 'auto';
+        el.ytDockPanel.style.bottom = 'auto';
+        el.ytDockPanel.classList.add('dragging');
+        ytDockHeader.setPointerCapture(e.pointerId);
+        e.preventDefault();
+      });
+
+      ytDockHeader.addEventListener('pointermove', (e) => {
+        if (!isDragging) return;
+        const rect = el.ytDockPanel.getBoundingClientRect();
+        const maxX = Math.max(8, window.innerWidth - rect.width - 8);
+        const maxY = Math.max(8, window.innerHeight - rect.height - 8);
+        const nextX = Math.min(Math.max(8, e.clientX - dragOffsetX), maxX);
+        const nextY = Math.min(Math.max(8, e.clientY - dragOffsetY), maxY);
+        el.ytDockPanel.style.left = `${nextX}px`;
+        el.ytDockPanel.style.top = `${nextY}px`;
+      });
+
+      const stopDrag = (e) => {
+        if (!isDragging) return;
+        isDragging = false;
+        el.ytDockPanel.classList.remove('dragging');
+        try {
+          if (e.pointerId !== undefined) ytDockHeader.releasePointerCapture(e.pointerId);
+          localStorage.setItem(
+            'focusbooks_yt_pos',
+            JSON.stringify({
+              left: parseFloat(el.ytDockPanel.style.left),
+              top: parseFloat(el.ytDockPanel.style.top)
+            })
+          );
+        } catch (_) {}
+      };
+
+      ytDockHeader.addEventListener('pointerup', stopDrag);
+      ytDockHeader.addEventListener('pointercancel', stopDrag);
+      window.addEventListener('resize', clampYtDockInsideViewport);
+    }
 
     el.ctrlModeChunking.querySelectorAll('.mini-pill').forEach((btn) => {
       btn.addEventListener('click', () => {
