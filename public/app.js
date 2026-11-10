@@ -708,13 +708,43 @@
         onStateChange: (event) => {
           if (state.audioEngine !== 'youtube') return;
 
-          if (event.data === 1 && !state.isPlaying) {
-            state.isPlaying = true;
-            el.iconPlay.classList.add('hidden');
-            el.iconPause.classList.remove('hidden');
-            el.syncStatusDot.classList.add('playing');
-            runYouTubeSyncLoop();
+          if (event.data === 1) {
+            state.lockScreenTtsFallbackActive = false;
+            if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+            if (!state.isPlaying) {
+              state.isPlaying = true;
+              el.iconPlay.classList.add('hidden');
+              el.iconPause.classList.remove('hidden');
+              el.syncStatusDot.classList.add('playing');
+              startLockScreenKeepAliveAudio();
+              runYouTubeSyncLoop();
+            }
           } else if (event.data === 2 && state.isPlaying) {
+            // If phone just went to Lock Screen / background, do NOT kill playback; try resuming or hand off to Lock Screen audio
+            const recentlyHidden =
+              document.hidden ||
+              document.visibilityState === 'hidden' ||
+              performance.now() - (state.lastVisibilityChangePerf || 0) < 2500;
+            if (recentlyHidden) {
+              try {
+                state.ytPlayer.playVideo();
+              } catch (_) {}
+              setTimeout(() => {
+                if (state.isPlaying && (document.hidden || document.visibilityState === 'hidden')) {
+                  const st = state.ytPlayer?.getPlayerState ? state.ytPlayer.getPlayerState() : 2;
+                  if (st !== 1 && !state.lockScreenTtsFallbackActive) {
+                    state.lockScreenTtsFallbackActive = true;
+                    const pc = state.parsedChapter;
+                    const tok = pc?.tokens[state.activeTokenIndex];
+                    const sent = tok ? pc.sentences[tok.sentenceIndex] : null;
+                    if (sent) {
+                      speakSentenceWebSpeech(sent, state.activeTokenIndex);
+                    }
+                  }
+                }
+              }, 700);
+              return;
+            }
             stopPlayback();
           }
         }
@@ -1242,26 +1272,168 @@
     }
   }
 
+  /* ============================================================================
+   * 5B. iOS LOCK SCREEN KEEP-ALIVE AUDIO & MEDIA SESSION API
+   * ============================================================================ */
+
+  function ensureKeepAliveAudioElement() {
+    if (state.keepAliveAudio) return state.keepAliveAudio;
+
+    // Generate a 2-second 22050Hz 16-bit mono WAV with a -68dB sub-audible carrier
+    // so iOS hardware audio session treats the PWA as an active Now Playing media app on Lock Screen
+    const sampleRate = 22050;
+    const numSamples = sampleRate * 2;
+    const buffer = new ArrayBuffer(44 + numSamples * 2);
+    const view = new DataView(buffer);
+
+    const writeStr = (offset, str) => {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    };
+    writeStr(0, 'RIFF');
+    view.setUint32(4, 36 + numSamples * 2, true);
+    writeStr(8, 'WAVE');
+    writeStr(12, 'fmt ');
+    view.setUint32(16, 16, true);
+    view.setUint16(20, 1, true);
+    view.setUint16(22, 1, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * 2, true);
+    view.setUint16(32, 2, true);
+    view.setUint16(34, 16, true);
+    writeStr(36, 'data');
+    view.setUint32(40, numSamples * 2, true);
+
+    for (let i = 0; i < numSamples; i++) {
+      const sample = Math.round(Math.sin((2 * Math.PI * 60 * i) / sampleRate) * 8);
+      view.setInt16(44 + i * 2, sample, true);
+    }
+
+    const blob = new Blob([buffer], { type: 'audio/wav' });
+    const audio = new Audio(URL.createObjectURL(blob));
+    audio.loop = true;
+    audio.playsInline = true;
+    audio.setAttribute('playsinline', '');
+    audio.volume = 0.02;
+    state.keepAliveAudio = audio;
+    return audio;
+  }
+
+  function updateLockScreenMediaSession() {
+    if (!('mediaSession' in navigator) || !state.book) return;
+    try {
+      const chapTitle = state.parsedChapter?.title || 'Chapter 1';
+      const coverSrc = normalizeRelativeAssetUrl(state.book.coverUrl || './books/palmer-eldritch/cover.jpeg');
+      const absCover = new URL(coverSrc, window.location.href).href;
+
+      navigator.mediaSession.metadata = new MediaMetadata({
+        title: `${chapTitle} — ${state.book.title}`,
+        artist: state.book.author || 'FocusBooks',
+        album: state.book.title || 'FocusBooks Reader',
+        artwork: [{ src: absCover, sizes: '512x512', type: 'image/jpeg' }]
+      });
+
+      navigator.mediaSession.playbackState = state.isPlaying ? 'playing' : 'paused';
+
+      navigator.mediaSession.setActionHandler('play', () => {
+        if (!state.isPlaying) startPlayback();
+        else if (state.audioEngine === 'youtube' && state.ytPlayer?.playVideo) {
+          state.ytPlayer.playVideo();
+        }
+      });
+      navigator.mediaSession.setActionHandler('pause', () => {
+        stopPlayback();
+      });
+      navigator.mediaSession.setActionHandler('previoustrack', () => {
+        el.btnPrevSentence.click();
+      });
+      navigator.mediaSession.setActionHandler('nexttrack', () => {
+        el.btnNextSentence.click();
+      });
+      navigator.mediaSession.setActionHandler('seekbackward', () => {
+        el.btnPrevSentence.click();
+      });
+      navigator.mediaSession.setActionHandler('seekforward', () => {
+        el.btnNextSentence.click();
+      });
+    } catch (_) {}
+  }
+
+  function startLockScreenKeepAliveAudio() {
+    try {
+      const ka = ensureKeepAliveAudioElement();
+      ka.play().catch(() => {});
+      updateLockScreenMediaSession();
+    } catch (_) {}
+  }
+
+  function stopLockScreenKeepAliveAudio() {
+    try {
+      if (state.keepAliveAudio) {
+        state.keepAliveAudio.pause();
+      }
+      if ('mediaSession' in navigator) {
+        navigator.mediaSession.playbackState = 'paused';
+      }
+    } catch (_) {}
+  }
+
+  document.addEventListener('visibilitychange', () => {
+    state.lastVisibilityChangePerf = performance.now();
+    if (!state.isPlaying) return;
+
+    if (document.hidden || document.visibilityState === 'hidden') {
+      startLockScreenKeepAliveAudio();
+      if (state.audioEngine === 'youtube' && state.ytPlayer && state.ytPlayerReady) {
+        try {
+          state.ytPlayer.playVideo();
+        } catch (_) {}
+      }
+    } else {
+      // Returned from Lock Screen to foreground
+      if (state.lockScreenTtsFallbackActive && state.audioEngine === 'youtube') {
+        state.lockScreenTtsFallbackActive = false;
+        if ('speechSynthesis' in window) window.speechSynthesis.cancel();
+        playYouTubeFromToken(state.activeTokenIndex);
+      } else {
+        setActiveToken(state.activeTokenIndex, { scrollIntoView: state.autoScroll, forceStageUpdate: true });
+      }
+    }
+  });
+
   function startPlayback() {
     if (!state.parsedChapter || state.parsedChapter.tokens.length === 0) return;
 
     state.isPlaying = true;
+    state.lockScreenTtsFallbackActive = false;
     el.iconPlay.classList.add('hidden');
     el.iconPause.classList.remove('hidden');
     el.syncStatusDot.classList.add('playing');
 
+    startLockScreenKeepAliveAudio();
     speakAndSyncFromToken(state.activeTokenIndex);
   }
 
   function stopPlayback() {
     state.isPlaying = false;
+    state.lockScreenTtsFallbackActive = false;
     el.iconPlay.classList.remove('hidden');
     el.iconPause.classList.add('hidden');
     el.syncStatusDot.classList.remove('playing');
 
+    stopLockScreenKeepAliveAudio();
+
     if (state.rafId) {
       cancelAnimationFrame(state.rafId);
       state.rafId = null;
+    }
+    if (state.bgSyncIntervalId) {
+      clearInterval(state.bgSyncIntervalId);
+      state.bgSyncIntervalId = null;
+    }
+    updateLockScreenMediaSession();
+    if (state.bgSyncIntervalId) {
+      clearInterval(state.bgSyncIntervalId);
+      state.bgSyncIntervalId = null;
     }
 
     if ('speechSynthesis' in window) {
@@ -1287,6 +1459,11 @@
       cancelAnimationFrame(state.rafId);
       state.rafId = null;
     }
+    if (state.bgSyncIntervalId) {
+      clearInterval(state.bgSyncIntervalId);
+      state.bgSyncIntervalId = null;
+    }
+    updateLockScreenMediaSession();
 
     const pc = state.parsedChapter;
     if (startTokenIndex >= pc.tokens.length) {
@@ -1359,6 +1536,11 @@
       cancelAnimationFrame(state.rafId);
       state.rafId = null;
     }
+    if (state.bgSyncIntervalId) {
+      clearInterval(state.bgSyncIntervalId);
+      state.bgSyncIntervalId = null;
+    }
+    updateLockScreenMediaSession();
 
     const pc = state.parsedChapter;
 
@@ -1412,6 +1594,12 @@
     }
 
     state.rafId = requestAnimationFrame(ytTick);
+    if (state.bgSyncIntervalId) clearInterval(state.bgSyncIntervalId);
+    state.bgSyncIntervalId = setInterval(() => {
+      if (document.hidden && state.isPlaying && state.audioEngine === 'youtube' && !state.lockScreenTtsFallbackActive) {
+        ytTick(performance.now());
+      }
+    }, 250);
   }
 
   /**
@@ -1535,6 +1723,12 @@
 
     window.speechSynthesis.speak(utterance);
     state.rafId = requestAnimationFrame(syncFrame);
+    if (state.bgSyncIntervalId) clearInterval(state.bgSyncIntervalId);
+    state.bgSyncIntervalId = setInterval(() => {
+      if (document.hidden && state.isPlaying && state.currentUtterance === utterance) {
+        syncFrame(performance.now());
+      }
+    }, 250);
   }
 
   function runVisualPacerLoop(startTokenIndex) {

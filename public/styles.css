@@ -197,13 +197,17 @@ html, body {
 }
 
 .app-shell {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  height: 100dvh;
-  max-height: 100dvh;
-  width: 100vw;
+  height: 100%;
+  width: 100%;
   overflow: hidden;
+  background-color: var(--bg-primary);
 }
 
 /* ================= TOP NAVIGATION BAR ================= */
@@ -214,7 +218,7 @@ html, body {
   min-height: 52px;
   height: auto;
   flex-wrap: nowrap;
-  padding: calc(6px + env(safe-area-inset-top, 0px)) 14px 6px;
+  padding: max(8px, env(safe-area-inset-top, 8px)) 14px 8px;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-subtle);
   gap: 8px;
@@ -1844,8 +1848,42 @@ html, body {
 @media (max-width: 860px) {
   .top-bar {
     flex-wrap: nowrap;
-    padding: calc(6px + env(safe-area-inset-top, 0px)) 10px 6px;
+    padding: max(8px, env(safe-area-inset-top, 8px)) 10px 8px;
     gap: 6px;
+  }
+
+  .sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    width: 84vw;
+    max-width: 310px;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 88;
+    box-shadow: 12px 0 36px rgba(0, 0, 0, 0.7);
+  }
+
+  .sidebar.collapsed {
+    margin-left: -100vw;
+  }
+
+  .settings-drawer {
+    width: 100vw;
+    max-width: 100vw;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    z-index: 98;
+  }
+
+  .modal-backdrop {
+    padding: max(16px, env(safe-area-inset-top, 16px)) 10px max(16px, env(safe-area-inset-bottom, 16px));
+  }
+
+  .modal-body {
+    max-height: calc(100dvh - 130px);
+    -webkit-overflow-scrolling: touch;
   }
 
   .top-bar-left {
