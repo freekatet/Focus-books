@@ -1,0 +1,36 @@
+{
+  "lastActiveBookId": "palmer-eldritch",
+  "settings": {
+    "theme": "bw-dark",
+    "fontSize": 20,
+    "lineHeight": 2,
+    "dimOpacity": 0.45,
+    "bionicEnabled": true,
+    "bionicDelta": 0
+  },
+  "books": [
+    {
+      "id": "palmer-eldritch",
+      "title": "The Three Stigmata of Palmer Eldritch",
+      "author": "Philip K. Dick",
+      "coverUrl": "/books/palmer-eldritch/cover.jpeg",
+      "sourceType": "epub+youtube",
+      "youtubeVideoId": "wlKEAxiQsDU",
+      "youtubeUrl": "https://www.youtube.com/watch?v=wlKEAxiQsDU",
+      "totalWords": 70414,
+      "chapterCount": 15,
+      "dataUrl": "/books/palmer-eldritch/book.json",
+      "progress": {
+        "chapterIndex": 2,
+        "chapterTitle": "Chapter TWO",
+        "tokenIndex": 1,
+        "videoTimeMs": 1487360,
+        "overallProgressPct": 6,
+        "speed": 1.3,
+        "mode": "teleprompter",
+        "audioEngine": "youtube",
+        "updatedAt": "2026-11-10T15:06:24.984Z"
+      }
+    }
+  ]
+}

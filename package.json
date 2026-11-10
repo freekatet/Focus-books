@@ -1,0 +1,13 @@
+{
+  "name": "focus-books-cognitive-reader",
+  "version": "1.0.0",
+  "description": "Cognitive Audio-Visual Reader with Bionic Reading, Syntactic Chunking, RSVP ORP Anchoring, Dynamic Karaoke Spotlight, and Paced Teleprompter",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

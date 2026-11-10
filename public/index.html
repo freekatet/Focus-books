@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="bw-dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="FocusBooks" />
+  <meta name="theme-color" content="#000000" />
+  <link rel="manifest" href="./manifest.json" />
+  <link rel="icon" type="image/svg+xml" href="./icon.svg" />
+  <link rel="apple-touch-icon" href="./icon.svg" />
+  <title>FocusBooks — Cognitive Audio-Visual Reader</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="app" class="app-shell">
+    <!-- Top Cognitive Navigation & Mode Bar -->
+    <header class="top-bar">
+      <div class="top-bar-left">
+        <button id="btn-toggle-sidebar" class="icon-btn" title="Chapters & Book Info (T)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="15" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <div class="book-identity" id="btn-open-chapters" title="Click to switch chapters">
+          <img id="book-cover-thumb" src="./books/palmer-eldritch/cover.jpeg" alt="Cover" class="cover-thumb" />
+          <div class="book-meta-text">
+            <div class="book-title-row">
+              <span id="book-title-display" class="book-title">The Three Stigmata of Palmer Eldritch</span>
+              <span class="book-author" id="book-author-display">Philip K. Dick</span>
+            </div>
+            <div class="chapter-subtitle-row">
+              <span id="chapter-title-display" class="chapter-badge">Chapter ONE</span>
+              <span id="chapter-stats-display" class="chapter-stats">4,122 words</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 5 Cognitive Display Modes Switcher -->
+      <nav class="mode-switcher" aria-label="Cognitive Display Modes">
+        <button class="mode-tab active" data-mode="bionic" title="Mode 1: Bionic Reading (Full Page Document Flow) [Key: 1]">
+          <span class="mode-num">1</span>
+          <span class="mode-label"><strong>Bio</strong>nic Flow</span>
+        </button>
+        <button class="mode-tab" data-mode="chunking" title="Mode 2: Syntactic Chunking (3-6 Word Stanza Layout) [Key: 2]">
+          <span class="mode-num">2</span>
+          <span class="mode-label">Syntactic Stanza</span>
+        </button>
+        <button class="mode-tab" data-mode="rsvp" title="Mode 3: Rapid Serial Visual Presentation with ORP Center Anchoring [Key: 3]">
+          <span class="mode-num">3</span>
+          <span class="mode-label">RSVP <span class="orp-dot">•</span> ORP</span>
+        </button>
+        <button class="mode-tab" data-mode="karaoke" title="Mode 4: Dynamic Karaoke / Spotlight Highlighting [Key: 4]">
+          <span class="mode-num">4</span>
+          <span class="mode-label">Karaoke Spotlight</span>
+        </button>
+        <button class="mode-tab" data-mode="teleprompter" title="Mode 5: Paced Teleprompter (Guided RSVP-Chunk Hybrid) [Key: 5]">
+          <span class="mode-num">5</span>
+          <span class="mode-label">Teleprompter</span>
+        </button>
+      </nav>
+
+      <!-- Right Controls: Focus Sprint Timer, Import EPUB/YouTube/Text, Settings -->
+      <div class="top-bar-right">
+        <div class="sprint-timer-pill" id="sprint-timer-widget" title="Cognitive Focus Sprint Timer">
+          <svg class="sprint-ring" width="26" height="26" viewBox="0 0 36 36">
+            <circle class="sprint-ring-bg" cx="18" cy="18" r="15" fill="none" stroke-width="3"></circle>
+            <circle id="sprint-ring-progress" class="sprint-ring-fg" cx="18" cy="18" r="15" fill="none" stroke-width="3" stroke-dasharray="94.25" stroke-dashoffset="0"></circle>
+          </svg>
+          <div class="sprint-info">
+            <span class="sprint-label">FOCUS SPRINT</span>
+            <span id="sprint-time-display" class="sprint-time">12:00</span>
+          </div>
+          <button id="btn-sprint-toggle" class="sprint-action-btn" title="Start / Pause Focus Sprint">Start</button>
+          <select id="sprint-duration-select" class="sprint-select" title="Select Focus Sprint Duration">
+            <option value="10">10m</option>
+            <option value="12" selected>12m</option>
+            <option value="15">15m</option>
+            <option value="20">20m</option>
+          </select>
+        </div>
+
+        <button id="btn-open-library" class="secondary-btn" title="Open Saved Library & Resume Playheads (L)">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+            <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+          </svg>
+          <span>Library (<span id="library-count-badge">1</span>)</span>
+        </button>
+
+        <button id="btn-open-import" class="secondary-btn" title="Import YouTube Audiobook, EPUB file, or custom text">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+            <polyline points="17 8 12 3 7 8"></polyline>
+            <line x1="12" y1="3" x2="12" y2="15"></line>
+          </svg>
+          <span>+ Import</span>
+        </button>
+
+        <button id="btn-toggle-settings" class="icon-btn" title="Typography, Themes & Audio Pipeline Settings">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Sub-toolbar: Cognitive Modifiers & Live Sync Telemetry -->
+    <div class="cognitive-subbar">
+      <div class="subbar-controls">
+        <label class="toggle-chip" title="Toggle Bionic 30-50% fixation stems on words (Key: B)">
+          <input type="checkbox" id="chk-bionic-stems" checked />
+          <span><strong>Bio</strong>nic Stems</span>
+        </label>
+
+        <div class="control-group" id="ctrl-bionic-intensity">
+          <span class="ctrl-label">Fixation:</span>
+          <button class="mini-pill" data-bionic-delta="-1" title="Lighter stem (30%)">Light</button>
+          <button class="mini-pill active" data-bionic-delta="0" title="Standard spec stem (35-45%)">Spec</button>
+          <button class="mini-pill" data-bionic-delta="1" title="Stronger stem (50%)">Deep</button>
+        </div>
+
+        <!-- Quick Audio Source Switcher Pill -->
+        <div class="control-group">
+          <span class="ctrl-label">Audio Stream:</span>
+          <button class="mini-pill active" id="pill-source-youtube" data-audio-source="youtube" title="Option C: Synchronized YouTube Audiobook Stream with exact word timestamps">
+            ▶ YouTube Audiobook
+          </button>
+          <button class="mini-pill" id="pill-source-webspeech" data-audio-source="webspeech" title="Option B: Native Browser Web Speech TTS + onboundary">
+            Web Speech TTS
+          </button>
+          <button class="mini-pill" id="pill-source-pacer" data-audio-source="pacer" title="Silent 60Hz Visual Pacer Clock">
+            Silent Pacer
+          </button>
+        </div>
+
+        <!-- Mode 2 (Syntactic Chunking) specific controls -->
+        <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-chunking">
+          <span class="ctrl-label">Stanza Align:</span>
+          <button class="mini-pill active" data-stanza-align="left">Left Column (400px)</button>
+          <button class="mini-pill" data-stanza-align="center">Centered Poetry</button>
+        </div>
+
+        <!-- Mode 3 (RSVP + ORP) specific controls -->
+        <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-rsvp">
+          <span class="ctrl-label">RSVP Window:</span>
+          <button class="mini-pill active" data-rsvp-size="1">1 Word (Pure ORP)</button>
+          <button class="mini-pill" data-rsvp-size="2">2-Word Micro-Chunk</button>
+        </div>
+
+        <!-- Mode 4 (Karaoke Spotlight) specific controls -->
+        <div class="control-group mode-specific-ctrl hidden" id="ctrl-mode-karaoke">
+          <span class="ctrl-label">Spotlight Structure:</span>
+          <button class="mini-pill active" data-karaoke-layout="paragraph">Full Paragraphs</button>
+          <button class="mini-pill" data-karaoke-layout="stanza">Chunked Clauses</button>
+        </div>
+
+        <label class="toggle-chip" title="Automatically keep active spoken sentence vertically centered in viewport">
+          <input type="checkbox" id="chk-autoscroll" checked />
+          <span>Auto-Center</span>
+        </label>
+
+        <div class="control-group">
+          <button class="mini-pill active" id="btn-quick-bw" title="Toggle Super-Contrasted Pure Black & White Theme">
+            ◐ Pure B&W (Black)
+          </button>
+        </div>
+      </div>
+
+      <!-- Real-Time Synchronization Telemetry HUD -->
+      <div class="sync-telemetry">
+        <span class="sync-indicator" id="sync-status-dot"></span>
+        <span id="sync-engine-badge" class="telemetry-item">YouTube json3 + 60Hz rAF</span>
+        <span class="telemetry-sep">·</span>
+        <span id="telemetry-word-pos" class="telemetry-item">Word 1 / 4122</span>
+        <span class="telemetry-sep">·</span>
+        <span id="telemetry-clause-pos" class="telemetry-item">Clause 1</span>
+        <span class="telemetry-sep">·</span>
+        <span id="telemetry-wpm" class="telemetry-item highlight">185 WPM</span>
+      </div>
+    </div>
+
+    <!-- Main Workspace: Sidebar + Cognitive Reader Stage + Settings Drawer -->
+    <div class="workspace-body">
+      <!-- Left Sidebar: Chapter Navigation & Book Overview -->
+      <aside id="chapter-sidebar" class="sidebar collapsed">
+        <div class="sidebar-header">
+          <h3>Table of Contents</h3>
+          <button id="btn-close-sidebar" class="icon-btn-sm" title="Close sidebar">✕</button>
+        </div>
+        <div class="sidebar-search">
+          <input type="text" id="input-search-book" placeholder="Search in chapter..." />
+        </div>
+        <ul id="chapter-list" class="chapter-list"></ul>
+        <div class="sidebar-footer">
+          <div class="spec-summary-card">
+            <div class="spec-title">Cognitive Mode Guide</div>
+            <p id="mode-description-text">
+              <strong>Mode 1 (Bionic Reading):</strong> Bolds the initial 30%–50% fixation stem of each word to guide saccadic eye jumps while peripheral vision resolves word endings.
+            </p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Primary Cognitive Reading Viewport -->
+      <main id="reading-viewport" class="reading-viewport">
+        <!-- Document / Stanza / Karaoke Scroll Stage (Modes 1, 2, 4) -->
+        <div id="document-stage" class="document-stage mode-bionic">
+          <div class="chapter-header-banner">
+            <div class="chapter-kicker" id="stage-book-title">THE THREE STIGMATA OF PALMER ELDRITCH</div>
+            <h1 id="stage-chapter-title">Chapter ONE</h1>
+            <div class="chapter-meta-bar" id="stage-chapter-meta">4,122 words · ~24 min at 1.0x</div>
+          </div>
+          <div id="tokens-container" class="tokens-container"></div>
+          <div class="chapter-end-nav">
+            <button id="btn-prev-chapter-stage" class="secondary-btn">← Previous Chapter</button>
+            <button id="btn-next-chapter-stage" class="primary-btn">Next Chapter →</button>
+          </div>
+        </div>
+
+        <!-- Mode 3: Rapid Serial Visual Presentation (RSVP) with ORP Anchoring Stage -->
+        <div id="rsvp-stage" class="rsvp-stage hidden">
+          <div class="rsvp-focal-container">
+            <div class="rsvp-header-meta">
+              <span class="rsvp-badge">MODE 3 · RSVP WITH OPTIMAL RECOGNITION POINT (ORP ~33% AXIS)</span>
+              <span id="rsvp-clause-counter" class="rsvp-counter">Sentence 1 of 299</span>
+            </div>
+
+            <div class="rsvp-reticle-box" id="rsvp-reticle-box">
+              <div class="orp-axis-line top"></div>
+              <div class="orp-axis-triangle top">▼</div>
+
+              <div class="rsvp-word-grid" id="rsvp-word-display">
+                <span class="rsvp-left" id="rsvp-left-part">unfa</span><span class="rsvp-orp" id="rsvp-orp-char">m</span><span class="rsvp-right" id="rsvp-right-part">iliar</span>
+              </div>
+
+              <div class="rsvp-second-word hidden" id="rsvp-second-word"></div>
+
+              <div class="orp-axis-triangle bottom">▲</div>
+              <div class="orp-axis-line bottom"></div>
+            </div>
+
+            <div class="rsvp-token-progress-track">
+              <div id="rsvp-token-progress-bar" class="rsvp-token-progress-bar"></div>
+            </div>
+
+            <div class="rsvp-context-card">
+              <div class="context-card-label">SURROUNDING SENTENCE CONTEXT (CLICK ANY WORD TO SEEK AUDIO & SYNC)</div>
+              <div id="rsvp-context-sentence" class="rsvp-context-sentence"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Mode 5: Paced Teleprompter / Guided RSVP-Chunk Hybrid Stage -->
+        <div id="teleprompter-stage" class="teleprompter-stage hidden">
+          <div class="teleprompter-focal-container">
+            <div class="rsvp-header-meta">
+              <span class="rsvp-badge">MODE 5 · PACED TELEPROMPTER (SYNTACTIC CLAUSE + RSVP HYBRID)</span>
+              <span id="teleprompter-clause-counter" class="rsvp-counter">Clause 1 of 1035</span>
+            </div>
+
+            <div id="teleprompter-prev-clause" class="teleprompter-neighbor prev">
+              —
+            </div>
+
+            <div class="teleprompter-active-box">
+              <div id="teleprompter-active-clause" class="teleprompter-active-clause"></div>
+              <div class="teleprompter-clause-progress">
+                <div id="teleprompter-progress-fill" class="teleprompter-progress-fill"></div>
+              </div>
+            </div>
+
+            <div id="teleprompter-next-clause" class="teleprompter-neighbor next">
+              —
+            </div>
+
+            <div class="rsvp-context-card">
+              <div class="context-card-label">CURRENT PARAGRAPH STREAM</div>
+              <div id="teleprompter-context-para" class="rsvp-context-sentence"></div>
+            </div>
+          </div>
+        </div>
+      </main>
+
+      <!-- Floating / Dockable YouTube Audio-Video Sync Player (Option C) -->
+      <div id="yt-dock-panel" class="yt-dock-panel">
+        <div class="yt-dock-header">
+          <div class="yt-dock-title-group">
+            <span class="yt-live-dot"></span>
+            <span class="yt-dock-title">YouTube Audiobook Sync</span>
+          </div>
+          <div class="yt-dock-actions">
+            <span id="yt-time-readout" class="yt-time-readout">00:30.8</span>
+            <button id="btn-toggle-yt-minimize" class="icon-btn-sm" title="Minimize / Expand Video Frame">_</button>
+          </div>
+        </div>
+        <div id="yt-player-body" class="yt-player-body">
+          <div id="yt-iframe-mount"></div>
+        </div>
+      </div>
+
+      <!-- Right Drawer: Typography, Cognitive & Audio Pipeline Settings -->
+      <aside id="settings-drawer" class="settings-drawer hidden">
+        <div class="sidebar-header">
+          <h3>Cognitive & Audio Settings</h3>
+          <button id="btn-close-settings" class="icon-btn-sm">✕</button>
+        </div>
+
+        <div class="settings-content">
+          <div class="settings-section">
+            <h4>Visual Theme</h4>
+            <div class="theme-grid">
+              <button class="theme-btn active" data-set-theme="bw-dark">Pure B&W (Black)</button>
+              <button class="theme-btn" data-set-theme="bw-light">Pure B&W (White)</button>
+              <button class="theme-btn" data-set-theme="obsidian">Obsidian Dark</button>
+              <button class="theme-btn" data-set-theme="sepia">Warm Sepia</button>
+              <button class="theme-btn" data-set-theme="paper">Daylight Paper</button>
+              <button class="theme-btn" data-set-theme="high-contrast">High Contrast</button>
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h4>Typography & Ergonomics</h4>
+            <div class="setting-row">
+              <label for="rng-font-size">Font Scale (<span id="lbl-font-size">20px</span>)</label>
+              <input type="range" id="rng-font-size" min="15" max="32" step="1" value="20" />
+            </div>
+            <div class="setting-row">
+              <label for="rng-line-height">Line Rhythm (<span id="lbl-line-height">2.0</span>)</label>
+              <input type="range" id="rng-line-height" min="1.5" max="2.6" step="0.1" value="2.0" />
+            </div>
+            <div class="setting-row">
+              <label for="rng-dim-opacity">Karaoke Past-Word Opacity (<span id="lbl-dim-opacity">0.45</span>)</label>
+              <input type="range" id="rng-dim-opacity" min="0.20" max="0.75" step="0.05" value="0.45" />
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h4>Audio / TTS Synchronization Pipeline</h4>
+            <div class="setting-row">
+              <label for="sel-audio-mode">Playback Engine</label>
+              <select id="sel-audio-mode" class="full-select">
+                <option value="youtube" selected>Option C: YouTube Audiobook + Word Timestamps</option>
+                <option value="webspeech">Option B: Web Speech API + onboundary + 60Hz rAF</option>
+                <option value="pacer">Silent Visual Pacer (60Hz Precision Clock Only)</option>
+                <option value="openai">Option A: OpenAI Audio TTS API (Cloud Stream)</option>
+              </select>
+            </div>
+
+            <div class="setting-row hidden" id="voice-select-container">
+              <label for="sel-tts-voice">Synthesizer Voice</label>
+              <select id="sel-tts-voice" class="full-select"></select>
+            </div>
+
+            <div class="setting-row hidden" id="cloud-api-container">
+              <label for="input-openai-key">OpenAI API Key (stored locally)</label>
+              <input type="password" id="input-openai-key" class="full-input" placeholder="sk-..." />
+            </div>
+          </div>
+
+          <div class="settings-section">
+            <h4>Keyboard Shortcuts</h4>
+            <ul class="shortcut-list">
+              <li><kbd>Space</kbd> Play / Pause Audio & Visual Sync</li>
+              <li><kbd>1</kbd>–<kbd>5</kbd> Switch Cognitive Display Modes</li>
+              <li><kbd>←</kbd> / <kbd>→</kbd> Previous / Next Sentence</li>
+              <li><kbd>[</kbd> / <kbd>]</kbd> Decrease / Increase Speed (0.05x)</li>
+              <li><kbd>B</kbd> Toggle Bionic Fixation Stems</li>
+              <li><kbd>Click Word</kbd> Seek Audio & Jump Directly to Word</li>
+            </ul>
+          </div>
+        </div>
+      </aside>
+    </div>
+
+    <!-- Bottom Transport & Granular Speed Control Bar -->
+    <footer class="transport-bar">
+      <div class="transport-left">
+        <button id="btn-prev-sentence" class="transport-icon-btn" title="Previous Sentence (←)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="19 20 9 12 19 4 19 20"></polygon>
+            <line x1="5" y1="19" x2="5" y2="5"></line>
+          </svg>
+        </button>
+
+        <button id="btn-play-pause" class="play-btn" title="Play / Pause Synchronized Reader (Space)">
+          <svg id="icon-play" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <polygon points="6 4 20 12 6 20 6 4"></polygon>
+          </svg>
+          <svg id="icon-pause" class="hidden" width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+          </svg>
+        </button>
+
+        <button id="btn-next-sentence" class="transport-icon-btn" title="Next Sentence (→)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <polygon points="5 4 15 12 5 20 5 4"></polygon>
+            <line x1="19" y1="5" x2="19" y2="19"></line>
+          </svg>
+        </button>
+      </div>
+
+      <div class="transport-center">
+        <div class="scrubber-top-row">
+          <span id="active-phrase-preview" class="active-phrase-preview">Ready — Click Play or any word to start synchronized reading</span>
+          <span id="chapter-time-remaining" class="time-remaining">00:00 / 24:16</span>
+        </div>
+        <input type="range" id="scrubber-range" class="scrubber-range" min="0" max="1000" value="0" />
+      </div>
+
+      <div class="transport-right">
+        <div class="speed-control-panel">
+          <div class="speed-header">
+            <span class="speed-title">SPEED</span>
+            <span id="speed-value-badge" class="speed-badge">1.00x</span>
+          </div>
+          <div class="speed-presets" role="group" aria-label="Granular Speed Presets">
+            <button class="speed-pill" data-speed="0.9">0.9x</button>
+            <button class="speed-pill active" data-speed="1.0">1.0x</button>
+            <button class="speed-pill" data-speed="1.1">1.1x</button>
+            <button class="speed-pill" data-speed="1.2">1.2x</button>
+            <button class="speed-pill" data-speed="1.3">1.3x</button>
+            <button class="speed-pill" data-speed="1.5">1.5x</button>
+          </div>
+        </div>
+        <input type="range" id="rng-speed" class="speed-slider" min="0.6" max="2.0" step="0.05" value="1.0" title="Fine Playback Speed Adjustment" />
+      </div>
+    </footer>
+
+    <!-- Modal: Persistent Library & Saved Playheads -->
+    <div id="modal-library" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>My Library & Saved Playheads</h2>
+          <button id="btn-close-library" class="icon-btn-sm">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <p class="import-hint">
+            Every EPUB, YouTube audiobook, and text passage you import is saved here with its exact playhead position (chapter, word index, cognitive mode, speed, and YouTube timestamp).
+          </p>
+          <div id="library-cards-container" class="library-list"></div>
+          <div class="modal-actions">
+            <button id="btn-library-to-import" class="primary-btn">+ Import New EPUB / YouTube Audiobook</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Load Input (YouTube Audiobook, EPUB File, Unpacked EPUB Folder, or Raw Text) -->
+    <div id="modal-import" class="modal-backdrop hidden">
+      <div class="modal-card">
+        <div class="modal-header">
+          <h2>Import Reading & Audio Input (YouTube / EPUB / Text)</h2>
+          <button id="btn-close-import" class="icon-btn-sm">✕</button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Section 1: YouTube Audiobook + Word-Level Caption Importer -->
+          <div class="import-box highlight-box">
+            <div class="import-box-badge">NEW · OPTION C</div>
+            <h3>1. YouTube Audiobook + Word-Level Captions (`json3`)</h3>
+            <p class="import-hint">
+              Import any YouTube audiobook/lecture directly using its timed captions (no EPUB required), OR align its audio timestamps onto your currently loaded EPUB:
+            </p>
+            <div class="path-input-row mb-8">
+              <input
+                type="text"
+                id="input-youtube-url"
+                class="full-input"
+                value="https://www.youtube.com/watch?v=wlKEAxiQsDU"
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+            </div>
+            <div class="modal-actions-left">
+              <button id="btn-import-yt-standalone" class="primary-btn">
+                ▶ Import YouTube Captions as Book (No EPUB)
+              </button>
+              <button id="btn-align-yt-epub" class="secondary-btn">
+                ⚡ Sync YouTube Audio to Current EPUB
+              </button>
+            </div>
+          </div>
+
+          <!-- Section 2: Pre-loaded / Local Path EPUB Loader -->
+          <div class="import-box">
+            <h3>2. Load Local EPUB Path (Unpacked Bundle or .epub Archive)</h3>
+            <p class="import-hint">Load directly from your local filesystem path:</p>
+            <div class="path-input-row">
+              <input
+                type="text"
+                id="input-local-epub-path"
+                class="full-input"
+                value="/Users/frexkatet/Desktop/The Three Stigmata of Palmer Eldritch.epub"
+              />
+              <button id="btn-load-local-path" class="secondary-btn">Load EPUB Path</button>
+            </div>
+          </div>
+
+          <!-- Section 3: File / Directory Picker -->
+          <div class="import-grid">
+            <div class="import-box">
+              <h3>3. Upload .epub or .txt File</h3>
+              <p class="import-hint">Select a standard zipped <code>.epub</code> or text file:</p>
+              <input type="file" id="file-input-single" accept=".epub,.txt,.md" class="file-input" />
+            </div>
+
+            <div class="import-box">
+              <h3>4. Select Unpacked .epub Folder</h3>
+              <p class="import-hint">For macOS Apple Books unpacked <code>.epub</code> packages:</p>
+              <input type="file" id="file-input-folder" webkitdirectory directory multiple class="file-input" />
+            </div>
+          </div>
+
+          <!-- Section 4: Phase 1 Raw Text Input Area -->
+          <div class="import-box">
+            <h3>5. Direct Text Input (Scratchpad)</h3>
+            <input type="text" id="input-custom-title" class="full-input mb-8" placeholder="Passage Title (optional)" />
+            <textarea
+              id="textarea-custom-text"
+              rows="4"
+              class="full-textarea"
+              placeholder="Paste any article, second-language study text, or book excerpt here..."
+            ></textarea>
+            <div class="modal-actions">
+              <button id="btn-load-sample-passage" class="secondary-btn">Fill Sample Passage</button>
+              <button id="btn-parse-custom-text" class="primary-btn">Parse & Read Text</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div id="toast-banner" class="toast-banner hidden"></div>
+  </div>
+
+  <script src="./cognitive-engine.js"></script>
+  <script src="./epub-loader.js"></script>
+  <script src="./app.js"></script>
+</body>
+</html>
