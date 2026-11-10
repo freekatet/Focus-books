@@ -548,7 +548,7 @@
         }
       });
       navigator.serviceWorker
-        .register('./sw.js?v=6')
+        .register('./sw.js?v=11')
         .then((reg) => reg.update())
         .catch(() => {});
     }
@@ -675,10 +675,16 @@
     el.ytDockPanel.classList.toggle('hidden', state.audioEngine !== 'youtube');
 
     // Dynamically resolve a live direct <audio> stream URL on the fly for ANY YouTube video (zero pre-downloaded files!)
-    if (window.EpubLoader && typeof window.EpubLoader.resolveYouTubeAudioStreamUrl === 'function') {
-      if (state.resolvedStreamVideoId !== videoId) {
+    if (window.EpubLoader) {
+      if (typeof window.EpubLoader.getDirectYouTubeAudioStreamUrl === 'function') {
+        state.liveYoutubeStreamUrl = window.EpubLoader.getDirectYouTubeAudioStreamUrl(videoId);
+        if (state.liveYoutubeStreamUrl && state.htmlAudio && state.htmlAudio.dataset.loadedSrc !== state.liveYoutubeStreamUrl) {
+          state.htmlAudio.src = state.liveYoutubeStreamUrl;
+          state.htmlAudio.dataset.loadedSrc = state.liveYoutubeStreamUrl;
+        }
+      }
+      if (typeof window.EpubLoader.resolveYouTubeAudioStreamUrl === 'function' && state.resolvedStreamVideoId !== videoId) {
         state.resolvedStreamVideoId = videoId;
-        state.liveYoutubeStreamUrl = null;
         window.EpubLoader.resolveYouTubeAudioStreamUrl(videoId).then((streamUrl) => {
           if (streamUrl && state.book?.youtubeVideoId === videoId) {
             state.liveYoutubeStreamUrl = streamUrl;
@@ -728,6 +734,11 @@
           if (state.audioEngine !== 'youtube' || state.usingNativeChapterAudio) return;
 
           if (event.data === 1) {
+            // If user tapped inside the YouTube player widget directly, route through native Lock-Screen-safe <audio> if available
+            if (state.liveYoutubeStreamUrl) {
+              startPlayback();
+              return;
+            }
             if (!state.isPlaying) {
               state.isPlaying = true;
               el.iconPlay.classList.add('hidden');
@@ -1487,6 +1498,7 @@
     if (!token) return;
 
     state.usingNativeChapterAudio = true;
+    updateLockScreenMediaSession();
     if (state.ytPlayer && state.ytPlayerReady && typeof state.ytPlayer.pauseVideo === 'function') {
       try {
         state.ytPlayer.pauseVideo();
@@ -1500,20 +1512,23 @@
     if (state.htmlAudio.dataset.loadedSrc !== audioSrc) {
       state.htmlAudio.src = audioSrc;
       state.htmlAudio.dataset.loadedSrc = audioSrc;
-      state.htmlAudio.load();
     }
 
     state.htmlAudio.playbackRate = state.speed;
-    try {
-      if (Math.abs((state.htmlAudio.currentTime || 0) - targetRelSec) > 0.35) {
-        state.htmlAudio.currentTime = targetRelSec;
-      }
-    } catch (_) {
+    if (state.htmlAudio.readyState >= 1) {
+      try {
+        if (Math.abs((state.htmlAudio.currentTime || 0) - targetRelSec) > 0.35) {
+          state.htmlAudio.currentTime = targetRelSec;
+        }
+      } catch (_) {}
+    } else {
       state.htmlAudio.addEventListener(
         'loadedmetadata',
         () => {
-          state.htmlAudio.currentTime = targetRelSec;
-          state.htmlAudio.playbackRate = state.speed;
+          try {
+            state.htmlAudio.currentTime = targetRelSec;
+            state.htmlAudio.playbackRate = state.speed;
+          } catch (_) {}
         },
         { once: true }
       );
@@ -1521,14 +1536,32 @@
 
     const syncFromAudioClock = () => {
       if (!state.isPlaying || !state.usingNativeChapterAudio) return;
+      const activePc = state.parsedChapter;
+      if (!activePc) return;
       const preciseMs = state.htmlAudio.currentTime * 1000 + chapterOffsetMs;
       el.ytTimeReadout.textContent = formatTimeMMSS(preciseMs / 1000);
 
-      const matchedIdx = window.CognitiveEngine.findTokenByTimestampMs(pc.tokens, preciseMs);
+      // Auto-advance chapters seamlessly during continuous YouTube audiobook streams
+      if (
+        chapterOffsetMs === 0 &&
+        preciseMs > activePc.videoEndMs + 600 &&
+        state.book &&
+        state.currentChapterIndex < state.book.chapters.length - 1
+      ) {
+        const nextChapIdx = state.currentChapterIndex + 1;
+        state.currentChapterIndex = nextChapIdx;
+        state.parsedChapter = window.CognitiveEngine.parseChapterCognitive(state.book.chapters[nextChapIdx]);
+        buildChapterDOM();
+        setActiveToken(0, { scrollIntoView: true, forceStageUpdate: true });
+        updateLockScreenMediaSession();
+        return;
+      }
+
+      const matchedIdx = window.CognitiveEngine.findTokenByTimestampMs(activePc.tokens, preciseMs);
       if (matchedIdx !== state.activeTokenIndex) {
         setActiveToken(matchedIdx, { scrollIntoView: state.autoScroll });
       }
-      const tok = pc.tokens[matchedIdx];
+      const tok = activePc.tokens[matchedIdx];
       if (tok) {
         const intra = Math.max(0, Math.min(1, (preciseMs - tok.startMs) / Math.max(40, tok.durationMs)));
         updateSubWordProgressBars(intra);

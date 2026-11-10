@@ -1,4 +1,4 @@
-const CACHE_NAME = 'focusbooks-v10';
+const CACHE_NAME = 'focusbooks-v11';
 const CORE_ASSETS = [
   './',
   './index.html',

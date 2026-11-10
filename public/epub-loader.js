@@ -778,20 +778,40 @@
   }
 
   const streamUrlCache = {};
+  const DEFAULT_STREAM_GATEWAY = 'https://sat-say-comment-dramatically.trycloudflare.com';
+
+  function getStreamBackendBase() {
+    const custom = localStorage.getItem('focusbooks_stream_gateway');
+    if (custom) return custom.replace(/\/+$/, '');
+    const host = window.location.hostname || '';
+    if (host.includes('github.io')) {
+      return DEFAULT_STREAM_GATEWAY;
+    }
+    return '';
+  }
+
+  function getDirectYouTubeAudioStreamUrl(videoId) {
+    if (!videoId) return null;
+    if (streamUrlCache[videoId]) return streamUrlCache[videoId];
+    const base = getStreamBackendBase();
+    const url = base
+      ? `${base}/api/youtube-audio?v=${encodeURIComponent(videoId)}`
+      : `./api/youtube-audio?v=${encodeURIComponent(videoId)}`;
+    streamUrlCache[videoId] = url;
+    return url;
+  }
 
   async function resolveYouTubeAudioStreamUrl(videoId) {
     if (!videoId) return null;
-    if (streamUrlCache[videoId]) return streamUrlCache[videoId];
+    const base = getStreamBackendBase();
+    const prewarmEndpoint = base
+      ? `${base}/api/youtube-stream?v=${encodeURIComponent(videoId)}`
+      : `./api/youtube-stream?v=${encodeURIComponent(videoId)}`;
 
-    const fetchWithTimeout = (url, ms = 2600) => {
-      const ctrl = new AbortController();
-      const timer = setTimeout(() => ctrl.abort(), ms);
-      return fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
-    };
-
-    // 1. Try local server on-the-fly resolver if available
     try {
-      const res = await fetchWithTimeout(`./api/youtube-stream?v=${encodeURIComponent(videoId)}`, 2200);
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 8000);
+      const res = await fetch(prewarmEndpoint, { signal: ctrl.signal }).finally(() => clearTimeout(timer));
       if (res.ok) {
         const data = await res.json();
         if (data && data.streamUrl) {
@@ -801,53 +821,7 @@
       }
     } catch (_) {}
 
-    // 2. Serverless iOS / Web fallback: query public Piped & Invidious APIs for live .m4a / HLS audio stream
-    const pipedHosts = [
-      'https://pipedapi.kavin.rocks',
-      'https://api.piped.private.coffee',
-      'https://pipedapi.tokhmi.xyz'
-    ];
-    for (const host of pipedHosts) {
-      try {
-        const res = await fetchWithTimeout(`${host}/streams/${videoId}`, 2500);
-        if (!res.ok) continue;
-        const info = await res.json();
-        if (info.hls) {
-          streamUrlCache[videoId] = info.hls;
-          return info.hls;
-        }
-        const audioStreams = info.audioStreams || [];
-        const m4a =
-          audioStreams.find((s) => s.mimeType && s.mimeType.includes('mp4') && s.url) ||
-          audioStreams.find((s) => s.url);
-        if (m4a && m4a.url) {
-          streamUrlCache[videoId] = m4a.url;
-          return m4a.url;
-        }
-      } catch (_) {}
-    }
-
-    const invidiousHosts = [
-      'https://inv.nadeko.net',
-      'https://invidious.nerdvpn.de'
-    ];
-    for (const host of invidiousHosts) {
-      try {
-        const res = await fetchWithTimeout(`${host}/api/v1/videos/${videoId}`, 2500);
-        if (!res.ok) continue;
-        const info = await res.json();
-        const adaptive = info.adaptiveFormats || [];
-        const audio =
-          adaptive.find((f) => f.type && f.type.includes('audio/mp4') && f.url) ||
-          adaptive.find((f) => f.type && f.type.startsWith('audio/') && f.url);
-        if (audio && audio.url) {
-          streamUrlCache[videoId] = audio.url;
-          return audio.url;
-        }
-      } catch (_) {}
-    }
-
-    return null;
+    return getDirectYouTubeAudioStreamUrl(videoId);
   }
 
   global.EpubLoader = {
@@ -865,6 +839,7 @@
     extractTimedWordsFromJson3,
     buildStandaloneBookFromYouTubeCaptions,
     alignYouTubeToBookClientSide,
+    getDirectYouTubeAudioStreamUrl,
     resolveYouTubeAudioStreamUrl
   };
 })(window);

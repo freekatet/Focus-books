@@ -797,7 +797,117 @@ function alignYouTubeCaptionsToBook(book, videoId, meta, ytWords) {
  * HTTP SERVER & API ROUTES
  * ============================================================================ */
 
+const ytStreamUrlCache = new Map();
+
+function resolveUpstreamYouTubeAudioUrl(videoId) {
+  const cached = ytStreamUrlCache.get(videoId);
+  if (cached && cached.expiresAt > Date.now()) {
+    return Promise.resolve(cached.url);
+  }
+  return new Promise((resolve, reject) => {
+    execFile(
+      'yt-dlp',
+      ['--js-runtimes', 'node', '-g', '-f', 'ba[ext=m4a]/ba', `https://www.youtube.com/watch?v=${videoId}`],
+      { timeout: 15000 },
+      (err, stdout) => {
+        const url = (stdout || '').trim().split('\n')[0];
+        if (err || !url) {
+          return reject(err || new Error('Could not resolve upstream YouTube audio stream'));
+        }
+        ytStreamUrlCache.set(videoId, {
+          url,
+          expiresAt: Date.now() + 90 * 60 * 1000 // 90 min cache
+        });
+        resolve(url);
+      }
+    );
+  });
+}
+
+function proxyUpstreamAudioStream(upstreamUrl, req, res, redirectCount = 0) {
+  if (redirectCount > 4) {
+    res.writeHead(502, { 'Content-Type': 'text/plain' });
+    res.end('Too many upstream redirects');
+    return;
+  }
+  const target = new URL(upstreamUrl);
+  const client = target.protocol === 'https:' ? https : http;
+  const reqHeaders = {
+    'User-Agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+    Accept: '*/*'
+  };
+  if (req.headers.range) {
+    reqHeaders.Range = req.headers.range;
+  }
+
+  const upstreamReq = client.request(
+    target,
+    {
+      method: req.method === 'HEAD' ? 'HEAD' : 'GET',
+      headers: reqHeaders
+    },
+    (upstreamRes) => {
+      if (
+        [301, 302, 303, 307, 308].includes(upstreamRes.statusCode) &&
+        upstreamRes.headers.location
+      ) {
+        upstreamRes.resume();
+        const nextUrl = new URL(upstreamRes.headers.location, target).toString();
+        proxyUpstreamAudioStream(nextUrl, req, res, redirectCount + 1);
+        return;
+      }
+
+      const outHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Range, Content-Type',
+        'Access-Control-Expose-Headers': 'Content-Range, Content-Length, Accept-Ranges',
+        'Accept-Ranges': upstreamRes.headers['accept-ranges'] || 'bytes',
+        'Content-Type': upstreamRes.headers['content-type'] || 'audio/mp4'
+      };
+      if (upstreamRes.headers['content-length']) {
+        outHeaders['Content-Length'] = upstreamRes.headers['content-length'];
+      }
+      if (upstreamRes.headers['content-range']) {
+        outHeaders['Content-Range'] = upstreamRes.headers['content-range'];
+      }
+
+      res.writeHead(upstreamRes.statusCode || 200, outHeaders);
+      if (req.method === 'HEAD') {
+        upstreamRes.resume();
+        res.end();
+        return;
+      }
+      upstreamRes.pipe(res);
+    }
+  );
+
+  upstreamReq.on('error', (err) => {
+    if (!res.headersSent) {
+      res.writeHead(502, { 'Content-Type': 'text/plain' });
+    }
+    res.end(`Upstream stream error: ${err.message}`);
+  });
+
+  req.on('close', () => {
+    upstreamReq.destroy();
+  });
+
+  upstreamReq.end();
+}
+
 const server = http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Range');
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, Content-Length, Accept-Ranges');
+
+  if (req.method === 'OPTIONS') {
+    res.writeHead(204);
+    res.end();
+    return;
+  }
+
   const parsedUrl = new URL(req.url, `http://${req.headers.host}`);
   const pathname = decodeURIComponent(parsedUrl.pathname);
 
@@ -996,25 +1106,39 @@ const server = http.createServer(async (req, res) => {
       res.end(JSON.stringify({ error: 'Invalid YouTube Video ID' }));
       return;
     }
-    execFile(
-      'yt-dlp',
-      ['--js-runtimes', 'node', '-g', '-f', 'ba[ext=m4a]/ba', `https://www.youtube.com/watch?v=${videoId}`],
-      { timeout: 12000 },
-      (err, stdout) => {
-        const streamUrl = (stdout || '').trim().split('\n')[0];
-        if (err || !streamUrl) {
-          res.writeHead(404, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: 'Could not resolve direct stream' }));
-          return;
-        }
-        res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
-        res.end(JSON.stringify({ videoId, streamUrl }));
-      }
-    );
+    try {
+      await resolveUpstreamYouTubeAudioUrl(videoId);
+      const proto = req.headers['x-forwarded-proto'] || 'http';
+      const host = req.headers['x-forwarded-host'] || req.headers.host;
+      const streamUrl = `${proto}://${host}/api/youtube-audio?v=${encodeURIComponent(videoId)}`;
+      res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8' });
+      res.end(JSON.stringify({ videoId, streamUrl }));
+    } catch (err) {
+      res.writeHead(404, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ error: 'Could not resolve direct stream' }));
+    }
     return;
   }
 
-  // Static file serving
+  // API 6: Live HTTP Range Audio Proxy for ANY YouTube Video ID (enables iOS Safari Lock Screen & background play)
+  if (pathname === '/api/youtube-audio' && (req.method === 'GET' || req.method === 'HEAD')) {
+    const videoId = extractYouTubeId(parsedUrl.searchParams.get('v') || parsedUrl.searchParams.get('url') || '');
+    if (!videoId) {
+      res.writeHead(400, { 'Content-Type': 'text/plain' });
+      res.end('Invalid YouTube Video ID');
+      return;
+    }
+    try {
+      const upstreamUrl = await resolveUpstreamYouTubeAudioUrl(videoId);
+      proxyUpstreamAudioStream(upstreamUrl, req, res);
+    } catch (err) {
+      res.writeHead(502, { 'Content-Type': 'text/plain' });
+      res.end(`Failed to resolve YouTube audio stream: ${err.message}`);
+    }
+    return;
+  }
+
+  // Static file serving (with HTTP Range 206 Partial Content support for iOS Safari)
   let safePath = pathname === '/' ? '/index.html' : pathname;
   const filePath = path.normalize(path.join(PUBLIC_DIR, safePath));
   if (!filePath.startsWith(PUBLIC_DIR)) {
@@ -1031,8 +1155,40 @@ const server = http.createServer(async (req, res) => {
     }
     const ext = path.extname(filePath).toLowerCase();
     const contentType = MIME_TYPES[ext] || 'application/octet-stream';
-    res.writeHead(200, { 'Content-Type': contentType });
-    fs.createReadStream(filePath).pipe(res);
+    const range = req.headers.range;
+
+    if (range) {
+      const parts = range.replace(/bytes=/, '').split('-');
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : stats.size - 1;
+      if (start >= stats.size || end >= stats.size || start > end) {
+        res.writeHead(416, { 'Content-Range': `bytes */${stats.size}` });
+        res.end();
+        return;
+      }
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${stats.size}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': end - start + 1,
+        'Content-Type': contentType
+      });
+      if (req.method === 'HEAD') {
+        res.end();
+        return;
+      }
+      fs.createReadStream(filePath, { start, end }).pipe(res);
+    } else {
+      res.writeHead(200, {
+        'Accept-Ranges': 'bytes',
+        'Content-Length': stats.size,
+        'Content-Type': contentType
+      });
+      if (req.method === 'HEAD') {
+        res.end();
+        return;
+      }
+      fs.createReadStream(filePath).pipe(res);
+    }
   });
 });
 
