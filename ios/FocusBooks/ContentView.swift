@@ -1,13 +1,10 @@
 import SwiftUI
 import WebKit
 import AVFoundation
+import MediaPlayer
 import UIKit
 
-/// Native iOS WebView wrapper with:
-/// 1. Native `AVAudioSession` (.playback) for Lock Screen & background audio
-/// 2. Cross-frame `WKUserScript` (`forMainFrameOnly: false`) injected inside `youtube.com/embed`
-///    that blocks YouTube's visibilitychange pause-on-lock script
-/// 3. Embedded `BundleHTTPServer` serving all 16 books offline directly from the iPhone app bundle
+/// Native iOS WebView wrapper with continuous background & Lock Screen audio support.
 struct FocusBooksWebView: UIViewRepresentable {
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -25,7 +22,11 @@ struct FocusBooksWebView: UIViewRepresentable {
         config.allowsPictureInPictureMediaPlayback = true
 
         // Inject into ALL frames (including cross-origin youtube.com/embed iframes!)
-        // so YouTube's embed player never detects backgrounding or Lock Screen transitions.
+        // 1. Replaces document.createElement('video') inside youtube.com/embed with a native <audio>
+        //    element (HTMLAudioElement) with video property shims so iOS WebKit C++ treats YouTube's
+        //    stream as pure <audio> (which iOS WebKit NEVER suspends in background or Lock Screen!)
+        // 2. Spoofs visibilityState/hidden & focus so YouTube JS never pauses on background/lock
+        // 3. Guards HTMLMediaElement.prototype.pause unless user explicitly clicked Pause
         let backgroundAudioUnlockJS = """
         (function() {
           try {
@@ -33,22 +34,92 @@ struct FocusBooksWebView: UIViewRepresentable {
             Object.defineProperty(document, 'webkitHidden', { get: function() { return false; }, configurable: true });
             Object.defineProperty(document, 'visibilityState', { get: function() { return 'visible'; }, configurable: true });
             Object.defineProperty(document, 'webkitVisibilityState', { get: function() { return 'visible'; }, configurable: true });
+            document.hasFocus = function() { return true; };
+
+            const blockedEvents = {
+              visibilitychange: true,
+              webkitvisibilitychange: true,
+              pagehide: true,
+              freeze: true,
+              blur: true
+            };
 
             const origDocAdd = document.addEventListener.bind(document);
             document.addEventListener = function(type, listener, options) {
-              if (type === 'visibilitychange' || type === 'webkitvisibilitychange' || type === 'pagehide' || type === 'blur') {
-                return;
-              }
+              if (blockedEvents[type]) return;
               return origDocAdd(type, listener, options);
             };
 
             const origWinAdd = window.addEventListener.bind(window);
             window.addEventListener = function(type, listener, options) {
-              if (type === 'visibilitychange' || type === 'webkitvisibilitychange' || type === 'pagehide' || type === 'blur') {
-                return;
-              }
+              if (blockedEvents[type]) return;
               return origWinAdd(type, listener, options);
             };
+
+            const isYT = (window.location.hostname.indexOf('youtube.com') !== -1 || window.location.hostname.indexOf('youtube-nocookie.com') !== -1);
+            if (isYT) {
+              // Convert YouTube's <video> element into a native WebKit <audio> element so iOS WebKit's
+              // C++ HTMLMediaElement::isVideo() returns false and NEVER suspends playback on Lock Screen!
+              const origCreateElement = document.createElement.bind(document);
+              document.createElement = function(tagName, options) {
+                if (typeof tagName === 'string' && tagName.toLowerCase() === 'video') {
+                  const audioEl = origCreateElement('audio', options);
+                  try {
+                    Object.defineProperty(audioEl, 'videoWidth', { get: function() { return 640; }, configurable: true });
+                    Object.defineProperty(audioEl, 'videoHeight', { get: function() { return 360; }, configurable: true });
+                    audioEl.width = 640;
+                    audioEl.height = 360;
+                    audioEl.playsInline = true;
+                    audioEl.webkitPlaysInline = true;
+                    audioEl.getVideoPlaybackQuality = function() {
+                      return {
+                        creationTime: performance.now(),
+                        totalVideoFrames: Math.floor(performance.now() / 33),
+                        droppedVideoFrames: 0,
+                        corruptedVideoFrames: 0
+                      };
+                    };
+                    audioEl.webkitEnterFullscreen = function() {};
+                    audioEl.webkitExitFullscreen = function() {};
+                  } catch (_) {}
+                  return audioEl;
+                }
+                return origCreateElement(tagName, options);
+              };
+
+              window.__fbUserPlaying = false;
+
+              origWinAdd('message', function(ev) {
+                try {
+                  if (typeof ev.data === 'string') {
+                    if (ev.data.indexOf('playVideo') !== -1) {
+                      window.__fbUserPlaying = true;
+                    } else if (ev.data.indexOf('pauseVideo') !== -1 || ev.data.indexOf('stopVideo') !== -1) {
+                      window.__fbUserPlaying = false;
+                    }
+                  }
+                } catch (_) {}
+              }, true);
+
+              const origPause = HTMLMediaElement.prototype.pause;
+              HTMLMediaElement.prototype.pause = function() {
+                if (!window.__fbUserPlaying || this.ended) {
+                  return origPause.apply(this, arguments);
+                }
+                return;
+              };
+
+              origDocAdd('pause', function(e) {
+                const media = e.target;
+                if (media && media instanceof HTMLMediaElement && !media.ended) {
+                  if (window.__fbUserPlaying) {
+                    setTimeout(function() {
+                      try { media.play(); } catch (_) {}
+                    }, 20);
+                  }
+                }
+              }, true);
+            }
           } catch (e) {}
         })();
         """
@@ -68,6 +139,9 @@ struct FocusBooksWebView: UIViewRepresentable {
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
 
+        NotificationCenter.default.removeObserver(webView, name: UIApplication.didEnterBackgroundNotification, object: nil)
+        NotificationCenter.default.removeObserver(webView, name: UIApplication.willResignActiveNotification, object: nil)
+
         context.coordinator.webView = webView
         context.coordinator.registerLifecycleObservers()
 
@@ -86,7 +160,7 @@ struct FocusBooksWebView: UIViewRepresentable {
     private func configureAudioSession() {
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playback, mode: .default, options: [.allowAirPlay, .allowBluetooth, .allowBluetoothA2DP])
+            try session.setCategory(.playback, mode: .default, options: [.mixWithOthers, .allowAirPlay, .allowBluetooth, .allowBluetoothA2DP])
             try session.setActive(true)
         } catch {
             print("AVAudioSession error: \(error)")
@@ -96,8 +170,17 @@ struct FocusBooksWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate {
         weak var webView: WKWebView?
         private var bgTask: UIBackgroundTaskIdentifier = .invalid
+        private var keepAlivePlayer: AVAudioPlayer?
 
         func registerLifecycleObservers() {
+            setupSilentKeepAliveAudio()
+
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleWillResignActive),
+                name: UIApplication.willResignActiveNotification,
+                object: nil
+            )
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(handleDidEnterBackground),
@@ -112,10 +195,59 @@ struct FocusBooksWebView: UIViewRepresentable {
             )
         }
 
-        @objc private func handleDidEnterBackground() {
+        private func setupSilentKeepAliveAudio() {
+            let sampleRate: Int = 8000
+            let numSamples = sampleRate
+            var wav = Data()
+
+            let dataSize = numSamples * 2
+            let fileSize = 36 + dataSize
+
+            wav.append("RIFF".data(using: .ascii)!)
+            wav.append(withUnsafeBytes(of: UInt32(fileSize).littleEndian) { Data($0) })
+            wav.append("WAVEfmt ".data(using: .ascii)!)
+            wav.append(withUnsafeBytes(of: UInt32(16).littleEndian) { Data($0) })
+            wav.append(withUnsafeBytes(of: UInt16(1).littleEndian) { Data($0) })
+            wav.append(withUnsafeBytes(of: UInt16(1).littleEndian) { Data($0) })
+            wav.append(withUnsafeBytes(of: UInt32(sampleRate).littleEndian) { Data($0) })
+            wav.append(withUnsafeBytes(of: UInt32(sampleRate * 2).littleEndian) { Data($0) })
+            wav.append(withUnsafeBytes(of: UInt16(2).littleEndian) { Data($0) })
+            wav.append(withUnsafeBytes(of: UInt16(16).littleEndian) { Data($0) })
+            wav.append("data".data(using: .ascii)!)
+            wav.append(withUnsafeBytes(of: UInt32(dataSize).littleEndian) { Data($0) })
+            wav.append(Data(count: dataSize))
+
             do {
-                try AVAudioSession.sharedInstance().setActive(true)
+                let player = try AVAudioPlayer(data: wav, fileTypeHint: AVFileType.wav.rawValue)
+                player.numberOfLoops = -1
+                player.volume = 0.01
+                player.prepareToPlay()
+                self.keepAlivePlayer = player
+            } catch {
+                print("Silent keep-alive audio init error: \(error)")
+            }
+        }
+
+        @objc private func handleWillResignActive() {
+            guard let webView = webView else { return }
+            NotificationCenter.default.removeObserver(webView, name: UIApplication.didEnterBackgroundNotification, object: nil)
+            NotificationCenter.default.removeObserver(webView, name: UIApplication.willResignActiveNotification, object: nil)
+            try? AVAudioSession.sharedInstance().setActive(true)
+            keepAlivePlayer?.play()
+        }
+
+        @objc private func handleDidEnterBackground() {
+            guard let webView = webView else { return }
+            NotificationCenter.default.removeObserver(webView, name: UIApplication.didEnterBackgroundNotification, object: nil)
+            NotificationCenter.default.removeObserver(webView, name: UIApplication.willResignActiveNotification, object: nil)
+
+            do {
+                let session = AVAudioSession.sharedInstance()
+                try session.setCategory(.playback, mode: .default, options: [.mixWithOthers, .allowAirPlay, .allowBluetooth, .allowBluetoothA2DP])
+                try session.setActive(true)
             } catch {}
+
+            keepAlivePlayer?.play()
 
             if bgTask == .invalid {
                 bgTask = UIApplication.shared.beginBackgroundTask(withName: "FocusBooksAudioKeepAlive") { [weak self] in
@@ -124,26 +256,6 @@ struct FocusBooksWebView: UIViewRepresentable {
                         self?.bgTask = .invalid
                     }
                 }
-            }
-
-            // Ensure any paused YouTube iframe resumes immediately after iOS background transition
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) { [weak self] in
-                self?.webView?.evaluateJavaScript("""
-                (function() {
-                  try {
-                    const btn = document.getElementById('icon-pause');
-                    const isPlaying = btn && !btn.classList.contains('hidden');
-                    if (isPlaying && window.YT) {
-                      const iframes = document.querySelectorAll('iframe');
-                      iframes.forEach(function(f) {
-                        if (f.contentWindow) {
-                          f.contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-                        }
-                      });
-                    }
-                  } catch (e) {}
-                })();
-                """, completionHandler: nil)
             }
         }
 
